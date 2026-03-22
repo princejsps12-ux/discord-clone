@@ -21,6 +21,7 @@
     "server"
   ],
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "concurrently": "^9.2.1",
     "wait-on": "^8.0.5"
   }
