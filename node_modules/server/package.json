@@ -4,12 +4,12 @@
   "description": "Discord clone API server",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "prisma migrate deploy && tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma migrate deploy"
+    "build": "node scripts/prisma-cli.cjs generate && tsc -p tsconfig.json",
+    "prisma:generate": "node scripts/prisma-cli.cjs generate",
+    "prisma:migrate": "node scripts/prisma-cli.cjs migrate dev",
+    "prisma:deploy": "node scripts/prisma-cli.cjs migrate deploy",
+    "dev": "node scripts/prisma-cli.cjs generate && nodemon src/index.ts",
+    "start": "node dist/index.js"
   },
   "keywords": [
     "express",
@@ -49,6 +49,7 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "nodemon": "^3.1.9",
     "tsx": "^4.21.0"
   }
 }
