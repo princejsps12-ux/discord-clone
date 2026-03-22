@@ -1,0 +1,258 @@
+import type { Express, NextFunction, Request, Response } from "express";
+import type { Server as SocketServer } from "socket.io";
+import type { PrismaClient } from "@prisma/client";
+import { bumpUserStreak } from "./streak";
+import { inferMessageCategory, extractCompanyTags } from "./categorize";
+import { sahayakAnswerFromHistory, sahayakSummarizeChat } from "./aiService";
+
+export const SAHAYAK_EMAIL = "sahayak-ai@bots.internal";
+
+type AuthRequest = Request & { userId?: string };
+type Role = "ADMIN" | "MODERATOR" | "MEMBER";
+
+export async function ensureSahayakMemberForServer(prisma: PrismaClient, serverId: string) {
+  const botUser = await prisma.user.upsert({
+    where: { email: SAHAYAK_EMAIL },
+    create: {
+      email: SAHAYAK_EMAIL,
+      name: "Sahayak AI",
+      provider: "system",
+    },
+    update: { name: "Sahayak AI" },
+  });
+  await prisma.member.upsert({
+    where: { userId_serverId: { userId: botUser.id, serverId } },
+    create: { userId: botUser.id, serverId, role: "MEMBER" },
+    update: {},
+  });
+  return botUser;
+}
+
+function formatHistoryLines(
+  rows: { member: { user: { name: string } }; content: string; isSahayakAi: boolean; isAiAssistant: boolean }[],
+) {
+  return rows
+    .map((m) => {
+      const who = m.isSahayakAi || m.isAiAssistant ? "Sahayak AI" : m.member.user.name;
+      const line = m.content.replace(/\s+/g, " ").trim();
+      return `[${who}]: ${line}`;
+    })
+    .join("\n");
+}
+
+export function registerSahayakRoutes(
+  app: Express,
+  prisma: PrismaClient,
+  io: SocketServer,
+  deps: {
+    auth: (req: AuthRequest, res: Response, next: NextFunction) => void;
+    param: (req: Request, key: string) => string;
+    incrementUnreadsForChannel: (
+      prisma: PrismaClient,
+      channelId: string,
+      serverId: string,
+      excludeUserId: string,
+    ) => Promise<void>;
+    updateChannelLastMessage: (prisma: PrismaClient, channelId: string, preview: string, senderName: string) => Promise<void>;
+  },
+) {
+  const { auth, param, incrementUnreadsForChannel, updateChannelLastMessage } = deps;
+
+  app.post("/api/channels/:channelId/sahayak", auth, async (req: AuthRequest, res) => {
+    const channelId = param(req, "channelId");
+    const body = req.body as {
+      summarize?: boolean | string | number;
+      prompt?: string;
+      userMessage?: string;
+    };
+    const s = body.summarize;
+    const wantSummary =
+      s === true || s === "true" || s === 1 || s === "1";
+    const { prompt, userMessage } = body;
+
+    const channel = await prisma.channel.findUnique({ where: { id: channelId } });
+    if (!channel || channel.type !== "TEXT") return res.status(404).json({ error: "Channel not found" });
+
+    const member = await prisma.member.findUnique({
+      where: { userId_serverId: { userId: req.userId!, serverId: channel.serverId } },
+      include: { user: true },
+    });
+    if (!member) return res.status(403).json({ error: "Forbidden" });
+
+    await ensureSahayakMemberForServer(prisma, channel.serverId);
+    const botUser = await prisma.user.findUnique({ where: { email: SAHAYAK_EMAIL } });
+    if (!botUser) return res.status(500).json({ error: "Sahayak bot user missing" });
+    const botMember = await prisma.member.findUnique({
+      where: { userId_serverId: { userId: botUser.id, serverId: channel.serverId } },
+    });
+    if (!botMember) return res.status(500).json({ error: "Sahayak bot member missing" });
+
+    const includeReactions = {
+      member: { include: { user: true } },
+      reactions: { include: { member: { include: { user: true } } } },
+    } as const;
+
+    try {
+      if (wantSummary) {
+        const recent = await prisma.message.findMany({
+          where: { channelId },
+          orderBy: { createdAt: "desc" },
+          take: 50,
+          include: { member: { include: { user: true } } },
+        });
+        const chronological = [...recent].reverse();
+        if (chronological.length === 0) {
+          const body =
+            "**Sahayak AI** — channel summary\n\nAbhi is channel pe koi message nahi hai jisse summary ban sake. Thodi chat karo, phir dubara **Summarize** dabao 🙂";
+          const botMsg = await prisma.message.create({
+            data: {
+              content: body,
+              channelId: channel.id,
+              serverId: channel.serverId,
+              memberId: botMember.id,
+              receiptStatus: "DELIVERED",
+              category: "UNCATEGORIZED",
+              isSahayakAi: true,
+              isAiAssistant: false,
+              tags: [],
+            },
+            include: includeReactions,
+          });
+          await updateChannelLastMessage(prisma, channel.id, "Sahayak: (empty channel)", "Sahayak AI");
+          await incrementUnreadsForChannel(prisma, channel.id, channel.serverId, req.userId!);
+          io.to(channel.id).emit("message:new", botMsg);
+          io.to(channel.serverId).emit("server:channel-activity", {
+            channelId: channel.id,
+            kind: "message",
+            lastMessagePreview: "Sahayak: empty channel",
+            lastMessageAt: botMsg.createdAt.toISOString(),
+            lastMessageSenderName: "Sahayak AI",
+            fromUserId: req.userId,
+          });
+          return res.status(201).json({ botMessage: botMsg });
+        }
+        const transcript = formatHistoryLines(chronological);
+        const summary = await sahayakSummarizeChat(transcript);
+        const body = `**Sahayak AI** — channel summary\n\n${summary}`;
+        const preview = `Sahayak: ${summary.slice(0, 80)}${summary.length > 80 ? "…" : ""}`;
+        const botMsg = await prisma.message.create({
+          data: {
+            content: body,
+            channelId: channel.id,
+            serverId: channel.serverId,
+            memberId: botMember.id,
+            receiptStatus: "DELIVERED",
+            category: "STUDY",
+            isSahayakAi: true,
+            isAiAssistant: false,
+            tags: [],
+          },
+          include: includeReactions,
+        });
+        await updateChannelLastMessage(prisma, channel.id, preview, "Sahayak AI");
+        await incrementUnreadsForChannel(prisma, channel.id, channel.serverId, req.userId!);
+        io.to(channel.id).emit("message:new", botMsg);
+        io.to(channel.serverId).emit("server:channel-activity", {
+          channelId: channel.id,
+          kind: "message",
+          lastMessagePreview: preview,
+          lastMessageAt: botMsg.createdAt.toISOString(),
+          lastMessageSenderName: "Sahayak AI",
+          fromUserId: req.userId,
+        });
+        return res.status(201).json({ botMessage: botMsg });
+      }
+
+      const trimmedUser = typeof userMessage === "string" ? userMessage.trim() : "";
+      let promptForModel = typeof prompt === "string" ? prompt.trim() : "";
+      if (!promptForModel && trimmedUser) {
+        promptForModel = trimmedUser.replace(/@sahayak\b/gi, "").replace(/\s+/g, " ").trim();
+      }
+      if (!promptForModel) {
+        promptForModel = "Based on recent chat, help out — koi specific doubt ho to batao.";
+      }
+
+      let userMsg = null;
+      if (trimmedUser) {
+        const text = trimmedUser;
+        const category = inferMessageCategory(text);
+        const tags = extractCompanyTags(text);
+        userMsg = await prisma.message.create({
+          data: {
+            content: text,
+            channelId: channel.id,
+            serverId: channel.serverId,
+            memberId: member.id,
+            receiptStatus: "DELIVERED",
+            category,
+            tags,
+          },
+          include: includeReactions,
+        });
+        void bumpUserStreak(prisma, req.userId!).catch(() => undefined);
+        await updateChannelLastMessage(
+          prisma,
+          channel.id,
+          text.slice(0, 200),
+          member.user.name,
+        );
+        await incrementUnreadsForChannel(prisma, channel.id, channel.serverId, req.userId!);
+        io.to(channel.id).emit("message:new", userMsg);
+        io.to(channel.serverId).emit("server:channel-activity", {
+          channelId: channel.id,
+          kind: "message",
+          lastMessagePreview: text.slice(0, 120),
+          lastMessageAt: userMsg.createdAt.toISOString(),
+          lastMessageSenderName: member.user.name,
+          fromUserId: req.userId,
+        });
+      }
+
+      const historyRows = await prisma.message.findMany({
+        where: { channelId },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: { member: { include: { user: true } } },
+      });
+      const chronological = [...historyRows].reverse();
+      const transcript = formatHistoryLines(chronological);
+      const answer = await sahayakAnswerFromHistory(transcript, promptForModel);
+      const body = `**Sahayak AI**\n\n${answer}`;
+      const preview = `Sahayak: ${answer.slice(0, 80)}${answer.length > 80 ? "…" : ""}`;
+      const botMsg = await prisma.message.create({
+        data: {
+          content: body,
+          channelId: channel.id,
+          serverId: channel.serverId,
+          memberId: botMember.id,
+          receiptStatus: "DELIVERED",
+          category: "STUDY",
+          isSahayakAi: true,
+          isAiAssistant: false,
+          tags: [],
+        },
+        include: includeReactions,
+      });
+      await updateChannelLastMessage(prisma, channel.id, preview, "Sahayak AI");
+      await incrementUnreadsForChannel(prisma, channel.id, channel.serverId, req.userId!);
+      io.to(channel.id).emit("message:new", botMsg);
+      io.to(channel.serverId).emit("server:channel-activity", {
+        channelId: channel.id,
+        kind: "message",
+        lastMessagePreview: preview,
+        lastMessageAt: botMsg.createdAt.toISOString(),
+        lastMessageSenderName: "Sahayak AI",
+        fromUserId: req.userId,
+      });
+
+      return res.status(201).json({ userMessage: userMsg, botMessage: botMsg });
+    } catch (e) {
+      console.error("Sahayak error", e);
+      const msg = e instanceof Error ? e.message : "unknown";
+      return res.status(500).json({
+        error: "Sahayak failed to respond",
+        detail: process.env.NODE_ENV === "development" ? msg : undefined,
+      });
+    }
+  });
+}
