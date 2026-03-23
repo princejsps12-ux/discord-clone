@@ -42,10 +42,12 @@ const prisma: PrismaClient = new PrismaClient();
 const allowOrigin = (origin?: string) => {
   if (!origin) return true;
   const configured = process.env.CLIENT_URL || "http://localhost:5173";
+  const allowedOrigins = configured.split(",").map((o) => o.trim());
   return (
-    origin === configured ||
+    allowedOrigins.includes(origin) ||
     /^http:\/\/localhost:\d+$/.test(origin) ||
-    /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)
+    /^http:\/\/127\.0\.0\.1:\d+$/.test(origin) ||
+    /^https:\/\/[\w-]+\.vercel\.app$/.test(origin)
   );
 };
 
