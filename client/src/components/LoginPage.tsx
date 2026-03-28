@@ -1,0 +1,227 @@
+import { useState, useEffect, type FormEvent } from "react";
+import s from "./LoginPage.module.css";
+
+type Props = {
+  authMode: "login" | "register";
+  email: string;
+  onEmailChange: (v: string) => void;
+  password: string;
+  onPasswordChange: (v: string) => void;
+  name: string;
+  onNameChange: (v: string) => void;
+  authError: string | null;
+  onSubmit: (e: FormEvent) => void;
+  onToggleMode: () => void;
+};
+
+export function LoginPage({
+  authMode,
+  email,
+  onEmailChange,
+  password,
+  onPasswordChange,
+  name,
+  onNameChange,
+  authError,
+  onSubmit,
+  onToggleMode,
+}: Props) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  /* Allow body scroll while login page is mounted */
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "auto";
+    document.body.style.height = "auto";
+    return () => {
+      document.body.style.overflow = prev || "";
+      document.body.style.height = "";
+    };
+  }, []);
+
+  return (
+    <div className={s.page}>
+      {/* Page-level background blobs */}
+      <div className={s.pageBlobTL} aria-hidden />
+      <div className={s.pageBlobBR} aria-hidden />
+      <div className={s.pageBlobMid} aria-hidden />
+
+      <div className={s.card}>
+        {/* ══════════════════ LEFT — Form ══════════════════ */}
+        <div className={s.formSide}>
+          {/* Discord logo */}
+          <div className={s.logo}>
+            <svg width="30" height="22" viewBox="0 0 71 55" fill="none" aria-label="Discord">
+              <path
+                d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.401329 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978ZM23.7259 37.3253C20.2276 37.3253 17.3451 34.1136 17.3451 30.1693C17.3451 26.225 20.1717 23.0133 23.7259 23.0133C27.308 23.0133 30.1626 26.2532 30.1066 30.1693C30.1066 34.1136 27.28 37.3253 23.7259 37.3253ZM47.3178 37.3253C43.8196 37.3253 40.9371 34.1136 40.9371 30.1693C40.9371 26.225 43.7636 23.0133 47.3178 23.0133C50.9 23.0133 53.7545 26.2532 53.6986 30.1693C53.6986 34.1136 50.9 37.3253 47.3178 37.3253Z"
+                fill="#7B2FBE"
+              />
+            </svg>
+            <span className={s.logoText}>Discord</span>
+          </div>
+
+          <h1 className={s.heading}>Hello!</h1>
+          <p className={s.subheading}>
+            {authMode === "login" ? "Sign in to your account" : "Create your account"}
+          </p>
+
+          <form onSubmit={onSubmit} className={s.form}>
+            {authMode === "register" && (
+              <div className={s.field}>
+                <span className={s.fieldIcon} aria-hidden>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </span>
+                <input
+                  className={s.input}
+                  value={name}
+                  onChange={(e) => onNameChange(e.target.value)}
+                  placeholder="Your name"
+                  autoComplete="name"
+                />
+              </div>
+            )}
+
+            <div className={s.field}>
+              <span className={s.fieldIcon} aria-hidden>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+              </span>
+              <input
+                className={s.input}
+                type="email"
+                value={email}
+                onChange={(e) => onEmailChange(e.target.value)}
+                placeholder="Email address"
+                autoComplete="email"
+              />
+            </div>
+
+            <div className={s.field}>
+              <span className={s.fieldIcon} aria-hidden>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </span>
+              <input
+                className={s.input}
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => onPasswordChange(e.target.value)}
+                placeholder="Password"
+                autoComplete={authMode === "login" ? "current-password" : "new-password"}
+              />
+              <button
+                type="button"
+                className={s.eyeBtn}
+                onClick={() => setShowPassword((v) => !v)}
+                tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
+              </button>
+            </div>
+
+            {authMode === "login" && (
+              <div className={s.rememberRow}>
+                <label className={s.checkLabel}>
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className={s.checkbox}
+                  />
+                  <span>Remember me</span>
+                </label>
+                <button type="button" className={s.forgotLink}>
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
+            {authError && <p className={s.errorMsg}>{authError}</p>}
+
+            <button className={s.signInBtn} type="submit">
+              {authMode === "login" ? "SIGN IN" : "CREATE ACCOUNT"}
+            </button>
+          </form>
+
+          <p className={s.switchMode}>
+            {authMode === "login" ? (
+              <>
+                Don&apos;t have an account?{" "}
+                <button type="button" onClick={onToggleMode} className={s.switchLink}>
+                  Create
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{" "}
+                <button type="button" onClick={onToggleMode} className={s.switchLink}>
+                  Sign in
+                </button>
+              </>
+            )}
+          </p>
+        </div>
+
+        {/* ══════════════════ RIGHT — Welcome ══════════════════ */}
+        <div className={s.welcomeSide} aria-hidden>
+          {/* Decorative blob shapes */}
+          <div className={s.wBlob1} />
+          <div className={s.wBlob2} />
+          <div className={s.wBlob3} />
+          <div className={s.wBlob4} />
+
+          {/* Cloud SVG decorations */}
+          <svg className={s.cloudTop} viewBox="0 0 200 120" fill="none" aria-hidden>
+            <ellipse cx="100" cy="80" rx="90" ry="50" fill="rgba(255,255,255,0.07)" />
+            <ellipse cx="70" cy="65" rx="55" ry="40" fill="rgba(255,255,255,0.06)" />
+            <ellipse cx="130" cy="60" rx="50" ry="38" fill="rgba(255,255,255,0.05)" />
+          </svg>
+          <svg className={s.cloudBot} viewBox="0 0 200 120" fill="none" aria-hidden>
+            <ellipse cx="100" cy="40" rx="90" ry="50" fill="rgba(255,255,255,0.07)" />
+            <ellipse cx="60" cy="55" rx="55" ry="40" fill="rgba(255,255,255,0.05)" />
+            <ellipse cx="140" cy="60" rx="50" ry="38" fill="rgba(255,255,255,0.06)" />
+          </svg>
+
+          <div className={s.welcomeContent}>
+            <div className={s.welcomeIconWrap}>
+              <svg width="48" height="36" viewBox="0 0 71 55" fill="none">
+                <path
+                  d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.401329 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978Z"
+                  fill="rgba(255,255,255,0.9)"
+                />
+              </svg>
+            </div>
+            <h2 className={s.welcomeHeading}>Welcome Back!</h2>
+            <p className={s.welcomeText}>
+              Sign in to continue to your communities, chats, and everything you love about Discord.
+            </p>
+            <div className={s.welcomeDots}>
+              <span className={s.dot} />
+              <span className={s.dot} />
+              <span className={s.dot} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

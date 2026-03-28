@@ -34,11 +34,11 @@ import { ChatHeader } from "./components/ChatHeader";
 import { Message, MessageSkeleton } from "./components/Message";
 import { MessageInput } from "./components/MessageInput";
 import { MembersPanel } from "./components/MembersPanel";
+import { LoginPage } from "./components/LoginPage";
 import { JoinCallPage, ScheduledCallPage } from "./pages/CallPages";
 import {
   EXAMPLE_GROUPS,
   hinglishChatHints,
-  INDIAN_NAMES,
   ui,
   st,
   type AppLocale,
@@ -875,31 +875,21 @@ function MainApp() {
 
   if (!DEMO_MODE && !token) {
     return (
-      <main className="flex min-h-screen flex-col bg-[#313338] text-white">
+      <>
         {backendBanner}
-        <div className="flex flex-1 items-center justify-center p-4">
-        <form onSubmit={onAuth} className="w-full max-w-sm space-y-3 rounded-lg bg-[#1E1F22] p-5">
-          <h1 className="text-xl font-semibold">{authMode === "login" ? ui.login : ui.register}</h1>
-          {authMode === "register" && (
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="input"
-              placeholder={`${ui.namePlaceholder} — ${INDIAN_NAMES[0]}`}
-            />
-          )}
-          <input value={email} onChange={(e) => setEmail(e.target.value)} className="input" placeholder={ui.emailPlaceholder} />
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input" placeholder={ui.passwordPlaceholder} />
-          {authError && <p className="rounded-md bg-red-900/40 px-3 py-2 text-sm text-red-200">{authError}</p>}
-          <button className="btn w-full" type="submit">
-            {ui.continue}
-          </button>
-          <button type="button" className="text-sm text-slate-300" onClick={() => setAuthMode((m) => (m === "login" ? "register" : "login"))}>
-            {authMode === "login" ? ui.needAccount : ui.haveAccount}
-          </button>
-        </form>
-        </div>
-      </main>
+        <LoginPage
+          authMode={authMode}
+          email={email}
+          onEmailChange={setEmail}
+          password={password}
+          onPasswordChange={setPassword}
+          name={name}
+          onNameChange={setName}
+          authError={authError}
+          onSubmit={onAuth}
+          onToggleMode={() => setAuthMode((m) => (m === "login" ? "register" : "login"))}
+        />
+      </>
     );
   }
 
