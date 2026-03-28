@@ -9,6 +9,7 @@ import {
   LogOut,
   Phone,
   Video,
+  Menu,
 } from "lucide-react";
 import type { StreakInfo } from "../types";
 import type { AppLocale } from "../content/hinglish";
@@ -33,6 +34,7 @@ type Props = {
   noChannelLabel: string;
   onStartCall?: () => void;
   onStartVideo?: () => void;
+  onOpenMobileNav?: () => void;
 };
 
 export function ChatHeader({
@@ -51,12 +53,23 @@ export function ChatHeader({
   noChannelLabel,
   onStartCall,
   onStartVideo,
+  onOpenMobileNav,
 }: Props) {
   const [searchFocused, setSearchFocused] = useState(false);
   const searchOpen = searchFocused || searchText.length > 0;
 
   return (
     <header className={s.header}>
+      {/* ── Hamburger (mobile only) ── */}
+      <button
+        type="button"
+        className={s.hamburger}
+        onClick={onOpenMobileNav}
+        aria-label="Open navigation"
+      >
+        <Menu size={20} />
+      </button>
+
       {/* ── Left: channel identity ── */}
       <div className={s.left}>
         {channelName ? (

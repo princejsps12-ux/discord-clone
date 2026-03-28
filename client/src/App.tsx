@@ -125,6 +125,7 @@ function MainApp() {
   const [noteUploading, setNoteUploading] = useState(false);
   const [summarizingChat, setSummarizingChat] = useState(false);
   const [membersOpen, setMembersOpen] = useState(true);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   /** userId → { channelId, channelName } for the voice channel they're in */
   const [voiceMembers, setVoiceMembers] = useState<Record<string, { channelId: string; channelName: string }>>({});
   /** userId currently speaking (via VAD/WebRTC event from server) */
@@ -903,7 +904,7 @@ function MainApp() {
   }
 
   return (
-    <main className={`app-shell${membersOpen ? "" : " no-members"}`}>
+    <main className={`app-shell${membersOpen ? "" : " no-members"}${mobileNavOpen ? " nav-open" : ""}`}>
       {/* ── Banner row — spans all 4 columns ── */}
       <div className="app-shell-banner">
         {backendBanner}
@@ -917,47 +918,59 @@ function MainApp() {
         )}
       </div>
 
-      {/* ── Rail — 72px server icon column ── */}
-      <ServerRail
-        servers={servers}
-        activeServerId={activeServer}
-        currentUser={user}
-        onSelectServer={setActiveServer}
-        onAddServer={createServer}
-        onJoinServer={() => void joinServerWithInvite()}
-      />
-
-      {/* ── Sidebar — 240px channel list column ── */}
-      {activeServer ? (
-        <ChannelSidebar
-          serverName={serverName}
-          inviteCode={servers.find((s) => s.id === activeServer)?.inviteCode}
-          inviteCopyTitle={ui.copyInviteTitle}
-          inviteCopyLabel={ui.copyInviteShort}
-          inviteCopiedMessage={ui.inviteCopiedOk}
-          clipboardFailMessage={ui.clipboardFail}
-          onInviteCopyError={(msg) => setActionError(msg)}
-          channels={channels}
-          activeChannel={activeChannel}
-          onSelectChannel={setActiveChannel}
-          listFilter={listFilter}
-          onListFilter={setListFilter}
-          sidebarQuery={sidebarQuery}
-          onSidebarQuery={setSidebarQuery}
-          members={members}
-          onTogglePin={togglePin}
-          onToggleFavorite={toggleFavorite}
-          onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
-          onCreateChannel={createChannel}
+      {/* ── Nav drawer — wraps Rail + Sidebar; slides in on mobile ── */}
+      <div className="app-nav-drawer">
+        {/* Rail — 72px server icon column */}
+        <ServerRail
+          servers={servers}
+          activeServerId={activeServer}
           currentUser={user}
-          voiceMembers={voiceMembers}
-          speakingUserId={speakingUserId}
-          className="app-shell-sidebar"
+          onSelectServer={(id) => { setActiveServer(id); setMobileNavOpen(false); }}
+          onAddServer={createServer}
+          onJoinServer={() => void joinServerWithInvite()}
         />
-      ) : (
-        <aside className="app-shell-sidebar" style={{ display: "flex", alignItems: "center", justifyContent: "center", borderRight: "1px solid var(--border)", background: "var(--bg-deep)", color: "var(--text-3)", fontSize: 13 }}>
-          {ui.selectServer}
-        </aside>
+
+        {/* Sidebar — 240px channel list column */}
+        {activeServer ? (
+          <ChannelSidebar
+            serverName={serverName}
+            inviteCode={servers.find((s) => s.id === activeServer)?.inviteCode}
+            inviteCopyTitle={ui.copyInviteTitle}
+            inviteCopyLabel={ui.copyInviteShort}
+            inviteCopiedMessage={ui.inviteCopiedOk}
+            clipboardFailMessage={ui.clipboardFail}
+            onInviteCopyError={(msg) => setActionError(msg)}
+            channels={channels}
+            activeChannel={activeChannel}
+            onSelectChannel={(id) => { setActiveChannel(id); setMobileNavOpen(false); }}
+            listFilter={listFilter}
+            onListFilter={setListFilter}
+            sidebarQuery={sidebarQuery}
+            onSidebarQuery={setSidebarQuery}
+            members={members}
+            onTogglePin={togglePin}
+            onToggleFavorite={toggleFavorite}
+            onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
+            onCreateChannel={createChannel}
+            currentUser={user}
+            voiceMembers={voiceMembers}
+            speakingUserId={speakingUserId}
+            className="app-shell-sidebar"
+          />
+        ) : (
+          <aside className="app-shell-sidebar" style={{ display: "flex", alignItems: "center", justifyContent: "center", borderRight: "1px solid var(--border)", background: "var(--bg-deep)", color: "var(--text-3)", fontSize: 13 }}>
+            {ui.selectServer}
+          </aside>
+        )}
+      </div>
+
+      {/* ── Mobile nav backdrop overlay ── */}
+      {mobileNavOpen && (
+        <div
+          className="nav-overlay"
+          onClick={() => setMobileNavOpen(false)}
+          role="presentation"
+        />
       )}
 
       {/* ── Chat — 1fr main content column ── */}
@@ -977,6 +990,7 @@ function MainApp() {
           noChannelLabel={ui.noChannel}
           onStartCall={() => startVoiceSession(false)}
           onStartVideo={() => startVoiceSession(true)}
+          onOpenMobileNav={() => setMobileNavOpen(true)}
         />
 
         {/* ── Sub-toolbar (category filters + AI actions) ── */}
@@ -1265,18 +1279,16 @@ function MainApp() {
         )}
       </section>
 
-      {/* ── Members panel — 260px right column ── */}
-      {membersOpen && (
-        <div className="app-shell-members">
-          <MembersPanel
-            members={members}
-            typingUser={typingUser}
-            voiceMembers={Object.fromEntries(
-              Object.entries(voiceMembers).map(([uid, v]) => [uid, v.channelName])
-            )}
-          />
-        </div>
-      )}
+      {/* ── Members panel — 260px right column (fixed overlay on mobile/tablet) ── */}
+      <div className={`app-shell-members${membersOpen ? " members-open" : ""}`}>
+        <MembersPanel
+          members={members}
+          typingUser={typingUser}
+          voiceMembers={Object.fromEntries(
+            Object.entries(voiceMembers).map(([uid, v]) => [uid, v.channelName])
+          )}
+        />
+      </div>
 
       <GlobalSearchModal
         open={globalSearchOpen}

@@ -382,3 +382,49 @@
   width: 60%;
   animation-delay: 0.15s;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Responsive — Mobile (<768px)
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .row {
+    padding: 6px 10px 2px;
+    gap: 10px;
+  }
+
+  .rowGrouped {
+    padding: 1px 10px 1px 50px;
+  }
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+  }
+
+  .authorName {
+    font-size: 13px;
+  }
+
+  .text {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* Keep action bar always visible on mobile (no hover on touch) */
+  .actions {
+    top: 2px;
+    right: 8px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .reaction {
+    padding: 4px 8px;
+    min-height: 32px;
+  }
+
+  .skeleton {
+    padding: 10px 10px 4px;
+  }
+}

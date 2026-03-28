@@ -236,3 +236,88 @@
   color: var(--dnd);
   background: var(--dnd-soft);
 }
+
+/* ── Hamburger (mobile nav trigger) ─────────────────────────── */
+.hamburger {
+  display: none; /* hidden by default on tablet/desktop */
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
+  margin-right: 2px;
+}
+
+.hamburger:hover {
+  background: var(--bg-raised);
+  color: var(--text-1);
+}
+
+/* ── Mobile (< 768px) ───────────────────────────────────────── */
+@media (max-width: 767px) {
+  .header {
+    height: 56px;
+    padding: 0 10px 0 4px;
+    gap: 6px;
+  }
+
+  .hamburger {
+    display: flex; /* show on mobile */
+  }
+
+  .channelName {
+    max-width: 120px;
+    font-size: 14px;
+  }
+
+  /* Hide lower-priority actions on small screens */
+  .streak,
+  .sep,
+  .divider,
+  .topic,
+  .localePill,
+  .searchWrap {
+    display: none;
+  }
+
+  /* Keep only members toggle, logout, and scheduled calls badge */
+  .iconBtn:not(:last-of-type) {
+    width: 40px;
+    height: 40px;
+  }
+
+  .logoutBtn {
+    padding: 6px 8px;
+    font-size: 11px;
+    gap: 3px;
+  }
+
+  .right {
+    gap: 2px;
+  }
+}
+
+/* ── Tablet (768px – 1023px) ────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .header {
+    padding: 0 14px;
+    gap: 8px;
+  }
+
+  /* Compress search on tablet */
+  .searchWrap.searchOpen .searchInput,
+  .searchInput:focus {
+    max-width: 140px;
+    width: 140px;
+  }
+
+  .channelName {
+    max-width: 160px;
+  }
+}

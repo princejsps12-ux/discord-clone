@@ -221,3 +221,45 @@
 
 .typingText { font-size: 12px; color: var(--text-3); }
 .typingName { font-weight: 600; color: var(--text-2); }
+
+/* ══════════════════════════════════════════════════════════════
+   Responsive — Mobile (<768px)
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .bar {
+    padding: 8px 10px 6px;
+    gap: 8px;
+  }
+
+  .pill {
+    min-height: 50px;
+    border-radius: 14px;
+    padding: 6px 10px;
+  }
+
+  .attachBtn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  .textarea {
+    font-size: 15px;
+  }
+
+  .emojiBtn,
+  .sendBtn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  /* Hide gift button on mobile to save space */
+  .giftBtn {
+    display: none;
+  }
+
+  .typingRow {
+    padding: 2px 10px;
+  }
+}
