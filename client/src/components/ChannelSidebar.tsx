@@ -1,10 +1,98 @@
 import { useMemo, useState } from "react";
-import { format } from "date-fns";
-import { Link2, Pin, Search, Star, Hash, Volume2 } from "lucide-react";
-import clsx from "clsx";
-import type { ChannelRow, ServerMember } from "../types";
+import {
+  ChevronDown,
+  Hash,
+  Volume2,
+  Search,
+  Link2,
+  Pin,
+  Star,
+  Mic,
+  Headphones,
+  Settings,
+} from "lucide-react";
+import type { ChannelRow, ServerMember, User } from "../types";
 import { MemberAvatar } from "./MemberAvatar";
 import { presenceLine, sidebar } from "../content/hinglish";
+import s from "./ChannelSidebar.module.css";
+
+/* ── Voice avatar gradient palette (seeded by name) ────────── */
+const GRADIENTS = [
+  ["#5b7fff", "#a78bfa"],
+  ["#f472b6", "#fb923c"],
+  ["#34d399", "#06b6d4"],
+  ["#f59e0b", "#ef4444"],
+  ["#818cf8", "#38bdf8"],
+  ["#a78bfa", "#ec4899"],
+];
+
+function gradientFor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const [a, b] = GRADIENTS[h % GRADIENTS.length];
+  return `linear-gradient(135deg, ${a}, ${b})`;
+}
+
+function voiceInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts.length >= 2
+    ? (parts[0][0] + parts[1][0]).toUpperCase()
+    : name.slice(0, 2).toUpperCase();
+}
+
+/* ── Voice session data type ────────────────────────────────── */
+type VoiceSession = {
+  channelId: string;
+  channelName: string;
+  participants: ServerMember[];
+};
+
+/* ── VoiceActiveCard ────────────────────────────────────────── */
+function VoiceActiveCard({
+  session,
+  speakingUserId,
+}: {
+  session: VoiceSession;
+  speakingUserId: string | null;
+}) {
+  return (
+    <div className={s.voiceCardWrap}>
+      <div className={s.voiceCard}>
+        <div className={s.voiceCardInner}>
+          {/* Header */}
+          <div className={s.voiceCardHeader}>
+            <span className={s.voicePulseDot} aria-hidden />
+            <span className={s.voiceCardLabel} title={session.channelName}>
+              Voice Active — {session.channelName}
+            </span>
+          </div>
+
+          {/* Participant avatars */}
+          <div className={s.voiceAvatars}>
+            {session.participants.map((p) => {
+              const speaking = p.id === speakingUserId;
+              return (
+                <div
+                  key={p.id}
+                  className={`${s.voiceAvatar} ${speaking ? s.speaking : ""}`}
+                  style={p.imageUrl ? undefined : { background: gradientFor(p.name) }}
+                  title={p.name}
+                >
+                  {p.imageUrl ? (
+                    <img src={p.imageUrl} alt={p.name} />
+                  ) : (
+                    voiceInitials(p.name)
+                  )}
+                  <span className={s.voiceAvatarName}>{p.name}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export type ListFilter = "all" | "unread" | "favorites" | "groups";
 
@@ -28,17 +116,136 @@ type Props = {
   onToggleFavorite: (channelId: string, next: boolean) => void;
   onOpenGlobalSearch: () => void;
   onCreateChannel: () => void;
+  currentUser?: User | null;
+  voiceActiveCounts?: Record<string, number>;
+  /** userId → { channelId, channelName } for active voice sessions */
+  voiceMembers?: Record<string, { channelId: string; channelName: string }>;
+  speakingUserId?: string | null;
+  className?: string;
 };
 
-function formatListTime(iso?: string | null) {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    if (Date.now() - d.getTime() < 86_400_000) return format(d, "HH:mm");
-    return format(d, "dd/MM/yy");
-  } catch {
-    return "";
-  }
+const FILTERS: { id: ListFilter; label: string }[] = [
+  { id: "all", label: sidebar.filterAll },
+  { id: "unread", label: sidebar.filterUnread },
+  { id: "favorites", label: sidebar.filterFavorites },
+  { id: "groups", label: sidebar.filterGroups },
+];
+
+function ChannelIcon({ type }: { type: ChannelRow["type"] }) {
+  if (type === "VOICE") return <Volume2 size={14} />;
+  return <Hash size={14} />;
+}
+
+type ChannelItemProps = {
+  channel: ChannelRow;
+  active: boolean;
+  voiceCount?: number;
+  onSelect: () => void;
+  onTogglePin: () => void;
+  onToggleFavorite: () => void;
+};
+
+function ChannelItem({ channel, active, voiceCount, onSelect, onTogglePin, onToggleFavorite }: ChannelItemProps) {
+  const unread = channel.unreadCount ?? 0;
+  const isUnread = unread > 0 && !active;
+
+  const cls = [
+    s.channelItem,
+    active ? s.channelActive : "",
+    isUnread ? s.channelUnread : "",
+  ].filter(Boolean).join(" ");
+
+  return (
+    <button type="button" className={cls} onClick={onSelect}>
+      <span className={s.channelIcon}>
+        <ChannelIcon type={channel.type} />
+      </span>
+
+      <span className={s.channelName}>{channel.name}</span>
+
+      {channel.isPinned && <span className={s.pinDot} title="Pinned" />}
+
+      {channel.type === "VOICE" && voiceCount != null && voiceCount > 0 && (
+        <span className={s.voiceCount}>
+          <span className={s.voiceDot} />
+          {voiceCount}
+        </span>
+      )}
+
+      {isUnread && (
+        <span className={s.unreadBadge}>{unread > 99 ? "99+" : unread}</span>
+      )}
+
+      <span className={s.itemActions}>
+        <button
+          type="button"
+          className={`${s.actionBtn} ${channel.isFavorite ? s.actionActive : ""}`}
+          title={channel.isFavorite ? sidebar.unfavTitle : sidebar.favTitle}
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+        >
+          <Star size={12} />
+        </button>
+        <button
+          type="button"
+          className={`${s.actionBtn} ${channel.isPinned ? s.actionActive : ""}`}
+          title={channel.isPinned ? sidebar.unpinTitle : sidebar.pinTitle}
+          onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
+        >
+          <Pin size={12} />
+        </button>
+      </span>
+    </button>
+  );
+}
+
+type CategoryGroupProps = {
+  label: string;
+  channels: ChannelRow[];
+  activeChannel: string;
+  voiceActiveCounts: Record<string, number>;
+  onSelectChannel: (id: string) => void;
+  onTogglePin: (id: string, next: boolean) => void;
+  onToggleFavorite: (id: string, next: boolean) => void;
+  onCreateChannel: () => void;
+};
+
+function CategoryGroup({
+  label,
+  channels,
+  activeChannel,
+  voiceActiveCounts,
+  onSelectChannel,
+  onTogglePin,
+  onToggleFavorite,
+  onCreateChannel,
+}: CategoryGroupProps) {
+  if (channels.length === 0) return null;
+  return (
+    <div>
+      <div className={s.categoryHeader}>
+        <span className={s.categoryLabel}>{label}</span>
+        <button
+          type="button"
+          className={s.categoryAdd}
+          title="Add channel"
+          onClick={onCreateChannel}
+        >
+          +
+        </button>
+      </div>
+      {channels.map((c) => (
+        <ChannelItem
+          key={c.id}
+          channel={c}
+          active={c.id === activeChannel}
+          voiceCount={voiceActiveCounts[c.id]}
+          onSelect={() => onSelectChannel(c.id)}
+          onTogglePin={() => onTogglePin(c.id, !c.isPinned)}
+          onToggleFavorite={() => onToggleFavorite(c.id, !c.isFavorite)}
+        />
+      ))}
+    </div>
+  );
 }
 
 export function ChannelSidebar({
@@ -61,6 +268,11 @@ export function ChannelSidebar({
   onToggleFavorite,
   onOpenGlobalSearch,
   onCreateChannel,
+  currentUser,
+  voiceActiveCounts = {},
+  voiceMembers = {},
+  speakingUserId = null,
+  className,
 }: Props) {
   const [inviteCopied, setInviteCopied] = useState(false);
 
@@ -83,9 +295,8 @@ export function ChannelSidebar({
     const q = sidebarQuery.trim().toLowerCase();
     if (q) list = list.filter((c) => c.name.toLowerCase().includes(q));
     list.sort((a, b) => {
-      const ap = a.isPinned ? 0 : 1;
-      const bp = b.isPinned ? 0 : 1;
-      if (ap !== bp) return ap - bp;
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
       const at = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
       const bt = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
       return bt - at;
@@ -93,141 +304,103 @@ export function ChannelSidebar({
     return list;
   }, [channels, listFilter, sidebarQuery]);
 
+  const textChannels = filtered.filter((c) => c.type === "TEXT");
+  const voiceChannels = filtered.filter((c) => c.type === "VOICE");
+
   const memberMatch = useMemo(() => {
     const q = sidebarQuery.trim().toLowerCase();
     if (!q) return [];
-    return members.filter((m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)).slice(0, 6);
+    return members
+      .filter((m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
+      .slice(0, 6);
   }, [members, sidebarQuery]);
 
-  const filters: { id: ListFilter; label: string }[] = [
-    { id: "all", label: sidebar.filterAll },
-    { id: "unread", label: sidebar.filterUnread },
-    { id: "favorites", label: sidebar.filterFavorites },
-    { id: "groups", label: sidebar.filterGroups },
-  ];
-
-  const renderRow = (c: ChannelRow) => {
-    const preview = c.lastMessagePreview || (c.type === "VOICE" ? sidebar.voiceRoom : sidebar.noMessagesYet);
-    const unread = c.unreadCount ?? 0;
-    return (
-      <div
-        key={c.id}
-        className={clsx(
-          "group relative flex w-full items-start gap-2 rounded-lg px-2 py-2.5 text-left transition-all duration-150",
-          activeChannel === c.id ? "bg-[#3f4248] shadow-inner" : "hover:bg-[#35373c]",
-        )}
-      >
-        <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onSelectChannel(c.id)}>
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 truncate font-medium text-slate-100">
-              {c.type === "TEXT" ? <Hash className="h-4 w-4 shrink-0 text-slate-500" /> : <Volume2 className="h-4 w-4 shrink-0 text-amber-500/90" />}
-              <span className="truncate">{c.name}</span>
-              {c.isPinned && <Pin className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
-            </span>
-            <span className="shrink-0 text-[11px] tabular-nums text-slate-500">{formatListTime(c.lastMessageAt)}</span>
-          </div>
-          <div className="mt-0.5 flex items-center justify-between gap-2">
-            <p className="truncate text-xs text-slate-400">
-              {c.lastMessageSenderName ? <span className="text-slate-500">{c.lastMessageSenderName}: </span> : null}
-              {preview}
-            </p>
-            {unread > 0 && (
-              <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-semibold text-emerald-950 shadow-sm">
-                {unread > 99 ? "99+" : unread}
-              </span>
-            )}
-          </div>
-        </button>
-        <div className="flex shrink-0 flex-col gap-0.5 opacity-0 transition group-hover:opacity-100">
-          <button
-            type="button"
-            title={c.isFavorite ? sidebar.unfavTitle : sidebar.favTitle}
-            className="rounded p-1 text-slate-400 hover:bg-[#2B2D31] hover:text-amber-300"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite(c.id, !c.isFavorite);
-            }}
-          >
-            <Star className={clsx("h-4 w-4", c.isFavorite && "fill-amber-400 text-amber-400")} />
-          </button>
-          <button
-            type="button"
-            title={c.isPinned ? sidebar.unpinTitle : sidebar.pinTitle}
-            className="rounded p-1 text-slate-400 hover:bg-[#2B2D31] hover:text-white"
-            onClick={(e) => {
-              e.stopPropagation();
-              onTogglePin(c.id, !c.isPinned);
-            }}
-          >
-            <Pin className={clsx("h-4 w-4", c.isPinned && "text-amber-400")} />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const pinnedRows = filtered.filter((c) => c.isPinned);
-  const otherRows = filtered.filter((c) => !c.isPinned);
+  /** Derive active voice sessions grouped by channelId */
+  const voiceSessions = useMemo((): VoiceSession[] => {
+    const byChannel = new Map<string, VoiceSession>();
+    for (const [userId, { channelId, channelName }] of Object.entries(voiceMembers)) {
+      const member = members.find((m) => m.id === userId);
+      if (!member) continue;
+      // Fall back to matching by name when channelId is empty
+      const key = channelId || channelName;
+      if (!byChannel.has(key)) {
+        // Resolve canonical channelId from channels list if missing
+        const resolved = channelId || channels.find((c) => c.name === channelName)?.id || channelName;
+        byChannel.set(key, { channelId: resolved, channelName, participants: [] });
+      }
+      byChannel.get(key)!.participants.push(member);
+    }
+    return [...byChannel.values()];
+  }, [voiceMembers, members, channels]);
 
   return (
-    <aside className="flex w-[320px] shrink-0 flex-col border-r border-slate-700/80 bg-[#111214]">
-      <div className="border-b border-slate-700/80 px-3 py-3">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="min-w-0 truncate text-lg font-semibold tracking-tight text-white">{serverName}</h2>
-          <div className="flex shrink-0 items-center gap-1">
-            {inviteCode ? (
+    <aside className={[s.sidebar, className].filter(Boolean).join(" ")}>
+      {/* ── Header ── */}
+      <div className={s.header}>
+        <button type="button" className={s.serverBtn} title={serverName}>
+          <span className={s.serverName}>{serverName}</span>
+          <ChevronDown className={s.chevron} />
+        </button>
+
+        {/* Boost strip — decorative */}
+        <div className={s.boostStrip}>
+          <span>⚡</span>
+          <span>Boosted</span>
+        </div>
+
+        {/* Invite row */}
+        {(inviteCode || inviteCopied) && (
+          <div className={s.inviteRow}>
+            {inviteCopied ? (
+              <span className={s.inviteCopiedNote}>{inviteCopiedMessage}</span>
+            ) : inviteCode ? (
               <button
                 type="button"
+                className={s.inviteBtn}
                 title={inviteCopyTitle}
-                className="rounded-lg border border-slate-600/80 bg-[#1a1b1e] px-2 py-1.5 text-xs text-slate-200 transition hover:border-emerald-600/50 hover:text-white"
                 onClick={() => void copyInvite()}
               >
-                <span className="flex items-center gap-1">
-                  <Link2 className="h-3.5 w-3.5" />
-                  {inviteCopyLabel}
-                </span>
+                <Link2 size={11} />
+                {inviteCopyLabel}
               </button>
             ) : null}
-            <button type="button" className="btn shrink-0 py-1.5 text-xs" onClick={onCreateChannel}>
+            <button
+              type="button"
+              className={s.addChannelBtn}
+              title="Add channel"
+              onClick={onCreateChannel}
+            >
               +
             </button>
           </div>
-        </div>
-        {inviteCopied ? (
-          <p className="mb-2 rounded-md border border-emerald-700/50 bg-emerald-950/40 px-2 py-1.5 text-[11px] text-emerald-100/95">{inviteCopiedMessage}</p>
-        ) : null}
-        {inviteCode && !inviteCopied ? (
-          <p className="mb-2 break-all font-mono text-[10px] leading-snug text-slate-500" title={inviteCopyTitle}>
-            {inviteCode}
-          </p>
-        ) : null}
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+        )}
+
+        {/* Search */}
+        <div className={s.searchWrap}>
+          <Search className={s.searchIcon} />
           <input
             id="sidebar-channel-search"
-            className="input w-full border-slate-700 bg-[#1a1b1e] py-2 pl-9 pr-3 text-sm transition focus:border-emerald-600/50"
+            className={s.searchInput}
             placeholder={sidebar.searchPlaceholder}
             value={sidebarQuery}
             onChange={(e) => onSidebarQuery(e.target.value)}
           />
         </div>
-        <button
-          type="button"
-          onClick={onOpenGlobalSearch}
-          className="mt-2 w-full rounded-lg border border-slate-700/80 bg-[#1a1b1e] py-2 text-xs text-slate-400 transition hover:border-emerald-600/40 hover:text-slate-200"
-        >
+
+        {/* Global search */}
+        <button type="button" className={s.globalBtn} onClick={onOpenGlobalSearch}>
+          <Search size={12} />
           {sidebar.globalSearch}
         </button>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {filters.map((f) => (
+
+        {/* Filter chips */}
+        <div className={s.filters}>
+          {FILTERS.map((f) => (
             <button
               key={f.id}
               type="button"
+              className={`${s.chip} ${listFilter === f.id ? s.chipActive : ""}`}
               onClick={() => onListFilter(f.id)}
-              className={clsx(
-                "rounded-full px-3 py-1 text-xs font-medium transition",
-                listFilter === f.id ? "bg-emerald-600 text-white shadow" : "bg-[#2B2D31] text-slate-400 hover:bg-[#35373c] hover:text-slate-200",
-              )}
             >
               {f.label}
             </button>
@@ -235,42 +408,90 @@ export function ChannelSidebar({
         </div>
       </div>
 
+      {/* ── Member search results ── */}
       {memberMatch.length > 0 && (
-        <div className="border-b border-slate-700/60 px-3 py-2">
-          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">{sidebar.people}</p>
-          <ul className="space-y-1">
-            {memberMatch.map((m) => (
-              <li key={m.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-300">
-                <MemberAvatar name={m.name} imageUrl={m.imageUrl} showPresence isOnline={m.isOnline} />
-                <div className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-slate-200">{m.name}</span>
-                  <span className="text-[10px] text-slate-500">{presenceLine(m.isOnline, m.lastSeenAt)}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
+        <div className={s.memberMatches}>
+          <p className={s.sectionLabel}>{sidebar.people}</p>
+          {memberMatch.map((m) => (
+            <div key={m.id} className={s.memberRow}>
+              <MemberAvatar name={m.name} imageUrl={m.imageUrl} showPresence isOnline={m.isOnline} />
+              <div className={s.memberInfo}>
+                <p className={s.memberName}>{m.name}</p>
+                <p className={s.memberPresence}>{presenceLine(m.isOnline, m.lastSeenAt)}</p>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-2 py-2">
-        {pinnedRows.length > 0 && (
-          <div className="mb-2">
-            <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wide text-amber-500/90">{sidebar.pinned}</p>
-            <div className="space-y-0.5">{pinnedRows.map(renderRow)}</div>
-          </div>
-        )}
-        {otherRows.length > 0 && (
-          <div>
-            {pinnedRows.length > 0 && (
-              <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{sidebar.channels}</p>
-            )}
-            <div className="space-y-0.5">{otherRows.map(renderRow)}</div>
-          </div>
-        )}
-        {pinnedRows.length === 0 && otherRows.length === 0 && (
-          <p className="px-2 py-8 text-center text-sm text-slate-500">{sidebar.noMatch}</p>
+      {/* ── Voice active cards ── */}
+      {voiceSessions.map((session) => (
+        <VoiceActiveCard
+          key={session.channelId}
+          session={session}
+          speakingUserId={speakingUserId}
+        />
+      ))}
+
+      {/* ── Channel list ── */}
+      <div className={s.list}>
+        <CategoryGroup
+          label="Text Channels"
+          channels={textChannels}
+          activeChannel={activeChannel}
+          voiceActiveCounts={voiceActiveCounts}
+          onSelectChannel={onSelectChannel}
+          onTogglePin={onTogglePin}
+          onToggleFavorite={onToggleFavorite}
+          onCreateChannel={onCreateChannel}
+        />
+        <CategoryGroup
+          label="Voice Channels"
+          channels={voiceChannels}
+          activeChannel={activeChannel}
+          voiceActiveCounts={voiceActiveCounts}
+          onSelectChannel={onSelectChannel}
+          onTogglePin={onTogglePin}
+          onToggleFavorite={onToggleFavorite}
+          onCreateChannel={onCreateChannel}
+        />
+        {textChannels.length === 0 && voiceChannels.length === 0 && (
+          <p className={s.empty}>{sidebar.noMatch}</p>
         )}
       </div>
+
+      {/* ── Footer user bar ── */}
+      {currentUser && (
+        <div className={s.footer}>
+          <div className={s.footerAvatar}>
+            <MemberAvatar
+              name={currentUser.name}
+              imageUrl={currentUser.imageUrl}
+              className="h-8 w-8"
+              showPresence
+              isOnline={currentUser.isOnline}
+            />
+          </div>
+          <div className={s.footerInfo}>
+            <p className={s.footerName}>{currentUser.name}</p>
+            <p className={s.footerStatus}>
+              <span className={`${s.statusDot} ${currentUser.isOnline ? s.online : s.offline}`} />
+              {currentUser.isOnline ? "Online" : "Offline"}
+            </p>
+          </div>
+          <div className={s.footerControls}>
+            <button type="button" className={s.iconBtn} title="Mute mic">
+              <Mic size={15} />
+            </button>
+            <button type="button" className={s.iconBtn} title="Headphones">
+              <Headphones size={15} />
+            </button>
+            <button type="button" className={s.iconBtn} title="Settings">
+              <Settings size={15} />
+            </button>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

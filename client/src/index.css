@@ -1,14 +1,208 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
 
-body {
-  margin: 0;
-  font-family: Inter, system-ui, sans-serif;
+/* ══════════════════════════════════════════════════════════════
+   Design Tokens
+══════════════════════════════════════════════════════════════ */
+:root {
+  /* Backgrounds */
+  --bg-void:    #07080b;
+  --bg-deep:    #0c0e13;
+  --bg-surface: #111318;
+  --bg-raised:  #181c24;
+  --bg-float:   #1f2433;
+  --bg-hover:   #252d40;
+
+  /* --bg-surface at 85% opacity for blurred headers */
+  --bg-surface-alpha: rgba(17, 19, 24, 0.85);
+
+  /* Accent */
+  --accent:      #5b7fff;
+  --accent-dim:  #4a6ee0;
+  --accent-glow: rgba(91, 127, 255, 0.20);
+  --accent-soft: rgba(91, 127, 255, 0.10);
+  --accent-2:    #a78bfa;
+
+  /* Status */
+  --online:      #3dd68c;
+  --online-soft: rgba(61, 214, 140, 0.10);
+  --online-border: rgba(61, 214, 140, 0.25);
+  --idle:        #f5c542;
+  --idle-soft:   rgba(245, 197, 66, 0.08);
+  --idle-border: rgba(245, 197, 66, 0.40);
+  --dnd:         #f87171;
+  --dnd-soft:    rgba(248, 113, 113, 0.12);
+  --mention-bg:  rgba(255, 107, 107, 0.15);
+
+  /* Roles */
+  --mod: #34d399;
+
+  /* Text */
+  --text-1:     #eef0f8;
+  --text-2:     #8b95b0;
+  --text-3:     #4e5672;
+  --text-muted: #2e3450;
+
+  /* Borders */
+  --border:        rgba(255, 255, 255, 0.045);
+  --border-lit:    rgba(91, 127, 255, 0.30);
+  --border-strong: rgba(255, 255, 255, 0.10);
+
+  /* Shadows (full values) */
+  --shadow-sm:     0 1px 3px rgba(0, 0, 0, 0.40);
+  --shadow-md:     0 4px 16px rgba(0, 0, 0, 0.50);
+  --shadow-lg:     0 8px 32px rgba(0, 0, 0, 0.60);
+  --shadow-accent: 0 4px 24px rgba(91, 127, 255, 0.25);
+
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+
+  /* Motion */
+  --ease:        cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-fast: all 0.15s var(--ease);
+  --transition:      all 0.20s var(--ease);
+  --transition-slow: all 0.35s var(--ease);
+
+  /* Streak chip */
+  --streak-bg:     rgba(249, 115, 22, 0.12);
+  --streak-border: rgba(249, 115, 22, 0.20);
+  --amber:         #fdba74;
+
+  /* Category badge colours */
+  --badge-study-bg:      rgba(56, 189, 248, 0.15);
+  --badge-study:         #7dd3fc;
+  --badge-placement-bg:  rgba(167, 139, 250, 0.15);
+  --badge-placement:     #c4b5fd;
+  --badge-casual-bg:     rgba(251, 191, 36, 0.15);
+  --badge-casual:        #fcd34d;
+
+  /* Sahayak AI gradient stops */
+  --sahayak-bg:           rgba(109, 40, 217, 0.08);
+  --sahayak-bg-hover:     rgba(109, 40, 217, 0.13);
+  --sahayak-accent:       rgba(91, 127, 255, 0.05);
+  --sahayak-accent-hover: rgba(91, 127, 255, 0.08);
 }
 
+/* ══════════════════════════════════════════════════════════════
+   Resets
+══════════════════════════════════════════════════════════════ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--bg-void);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-weight: 400;
+  overflow: hidden;
+  height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-float) transparent;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
+
+/* ── Global scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-float); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--bg-hover); }
+
+/* ── Selection ───────────────────────────────────────────────── */
+::selection { background: var(--accent-soft); color: var(--accent); }
+
+/* ── Focus ring ──────────────────────────────────────────────── */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   App shell grid
+══════════════════════════════════════════════════════════════ */
+.app-shell {
+  display: grid;
+  grid-template-columns: 72px 240px 1fr 260px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "banner  banner  banner  banner"
+    "rail    sidebar chat    members";
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-void);
+  color: var(--text-1);
+}
+
+.app-shell-banner  { grid-area: banner; }
+.app-shell-rail    { grid-area: rail;    overflow-y: auto; }
+.app-shell-sidebar { grid-area: sidebar; overflow-y: auto; }
+.app-shell-chat    {
+  grid-area: chat;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(91, 127, 255, 0.08), transparent),
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 100% 100%, 32px 32px, 32px 32px;
+  background-position: 0 0, -0.5px -0.5px, -0.5px -0.5px;
+}
+.app-shell-members { grid-area: members; overflow-y: auto; }
+
+.app-shell.no-members {
+  grid-template-columns: 72px 240px 1fr;
+  grid-template-areas:
+    "banner  banner  banner"
+    "rail    sidebar chat";
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Utility classes (Tailwind compat)
+══════════════════════════════════════════════════════════════ */
 .input {
-  @apply w-full rounded-md bg-[#1E1F22] border border-slate-700 px-3 py-2 text-sm text-white outline-none focus:border-indigo-400;
+  @apply w-full rounded-md border px-3 py-2 text-sm outline-none;
+  background: var(--bg-raised);
+  border-color: var(--border-strong);
+  color: var(--text-1);
+}
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .btn {
-  @apply rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-2 text-sm font-medium;
+  @apply rounded-md px-3 py-2 text-sm font-medium;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-fast);
 }
+.btn:hover { background: var(--accent-dim); }

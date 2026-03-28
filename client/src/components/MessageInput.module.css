@@ -1,0 +1,223 @@
+/* ── Outer wrapper ───────────────────────────────────────────── */
+.wrap {
+  flex-shrink: 0;
+  padding: 0 16px 16px;
+}
+
+/* ── Input bar ──────────────────────────────────────────────── */
+.bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  padding: 6px 8px 6px 4px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-raised);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow-sm);
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.bar:focus-within {
+  border-color: var(--accent);
+  background: var(--bg-float);
+  box-shadow:
+    0 0 0 3px var(--accent-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ── Icon buttons (left / right) ────────────────────────────── */
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 17px;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), transform 0.15s var(--ease-spring);
+}
+
+.iconBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+  transform: scale(1.1);
+}
+
+/* ── Textarea ───────────────────────────────────────────────── */
+.textarea {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  resize: none;
+  min-height: 34px;
+  max-height: 160px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-float) transparent;
+}
+
+.textarea::placeholder { color: var(--text-muted); }
+
+/* ── Send button ─────────────────────────────────────────────── */
+.sendBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-accent);
+  transition: background 0.15s var(--ease), box-shadow 0.15s var(--ease), transform 0.15s var(--ease-spring);
+}
+
+.sendBtn:hover:not(:disabled) {
+  background: var(--accent-dim);
+  transform: scale(1.08);
+  box-shadow: 0 4px 20px rgba(91, 127, 255, 0.45);
+}
+
+.sendBtn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.sendBtn:disabled {
+  background: var(--bg-float);
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Ripple */
+.sendBtn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0);
+  opacity: 0;
+}
+
+.sendBtn:active:not(:disabled)::after {
+  animation: rippleOut 0.4s var(--ease) forwards;
+}
+
+@keyframes rippleOut {
+  from { transform: scale(0); opacity: 1; }
+  to   { transform: scale(2.5); opacity: 0; }
+}
+
+/* ── Selected file preview ──────────────────────────────────── */
+.filePreview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.filePreviewName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filePreviewClear {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-xs);
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: var(--transition-fast);
+}
+
+.filePreviewClear:hover {
+  background: var(--dnd-soft);
+  color: var(--dnd);
+}
+
+/* ── Typing indicator ────────────────────────────────────────── */
+.typingRow {
+  height: 22px;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+  overflow: hidden;
+}
+
+.typingVisible {
+  animation: fadeSlideUp 0.2s var(--ease) both;
+}
+
+.typingHidden { opacity: 0; pointer-events: none; }
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Three-dot bounce */
+.dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-3);
+  animation: typingBounce 1.1s infinite;
+}
+
+.dot:nth-child(2) { animation-delay: 0.15s; }
+.dot:nth-child(3) { animation-delay: 0.30s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30%            { transform: translateY(-5px); }
+}
+
+.typingText { font-size: 12px; color: var(--text-3); }
+.typingName { font-weight: 600; color: var(--text-2); }

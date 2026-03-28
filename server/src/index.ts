@@ -26,7 +26,7 @@ type Role = "ADMIN" | "MODERATOR" | "MEMBER";
 const userConnectionCounts = new Map<string, number>();
 
 function bumpOnline(prisma: PrismaClient, userId: string, online: boolean) {
-  return prisma.user.update({
+  return prisma.user.updateMany({
     where: { id: userId },
     data: online
       ? { isOnline: true, lastSeenAt: new Date() }
@@ -719,3 +719,4 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 const port = Number(process.env.PORT || 4000);
 const host = process.env.BIND_HOST || "0.0.0.0";
 server.listen(port, host, () => console.log(`API running on http://127.0.0.1:${port} (bound ${host})`));
+

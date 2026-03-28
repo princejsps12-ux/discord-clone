@@ -1,0 +1,384 @@
+/* ── Mount animations ────────────────────────────────────────── */
+@keyframes messageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes newMessageIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Article shell ──────────────────────────────────────────── */
+.message {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px 2px;
+  transition: background 0.15s var(--ease);
+  animation: messageIn 0.22s var(--ease) both;
+}
+
+.message:hover { background: rgba(255, 255, 255, 0.018); }
+
+.message.grouped {
+  padding: 1px 16px 1px 72px;
+}
+
+.message.isNew {
+  animation: newMessageIn 0.25s var(--ease-spring) both;
+}
+
+/* Sahayak AI variant */
+.message.sahayak {
+  background: linear-gradient(135deg, var(--sahayak-bg) 0%, var(--sahayak-accent) 100%);
+  border-left: 2px solid var(--accent-2);
+}
+.message.sahayak:hover {
+  background: linear-gradient(135deg, var(--sahayak-bg-hover) 0%, var(--sahayak-accent-hover) 100%);
+}
+
+/* ── Avatar column ──────────────────────────────────────────── */
+.avatarCol {
+  flex-shrink: 0;
+  width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.groupedTime {
+  width: 40px;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: right;
+  line-height: 1;
+  padding-top: 1px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.message.grouped:hover .groupedTime { opacity: 1; }
+
+/* ── Body ───────────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Author row ─────────────────────────────────────────────── */
+.authorRow {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.authorName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.2;
+}
+
+.badge {
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.5;
+}
+
+.badgeAi         { background: var(--accent-2);          color: #fff; }
+.badgeStudy      { background: var(--badge-study-bg);    color: var(--badge-study); }
+.badgePlacement  { background: var(--badge-placement-bg);color: var(--badge-placement); }
+.badgeCasual     { background: var(--badge-casual-bg);   color: var(--badge-casual); }
+.badgeDefault    { background: var(--bg-float);          color: var(--text-3); }
+
+/* Role badges */
+.badgeAdmin { background: var(--accent-soft); color: var(--accent); }
+.badgeMod   { background: rgba(52, 211, 153, 0.1); color: #34d399; }
+
+.tag {
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  font-size: 10px;
+  color: var(--text-3);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+}
+
+.timestamp {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.receipt {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Message text ───────────────────────────────────────────── */
+.text {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mention {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 3px;
+  padding: 0 3px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.mention:hover { background: var(--accent-glow); }
+
+.inlineCode {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  font-size: 13px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 1px 5px;
+  color: #f9a8d4;
+}
+
+/* ── Attachment ─────────────────────────────────────────────── */
+.attachment { margin-top: 6px; }
+
+.attachImage {
+  max-height: 320px;
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  display: block;
+  transition: var(--transition);
+  cursor: zoom-in;
+}
+
+.attachImage:hover {
+  transform: scale(1.01);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-strong);
+}
+
+.attachLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.attachLink:hover { text-decoration: underline; }
+
+/* ── Reactions ──────────────────────────────────────────────── */
+.reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 5px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  line-height: 1.4;
+}
+
+.reaction:hover {
+  border-color: var(--border-strong);
+  transform: scale(1.05);
+}
+
+.reaction.reactionActive {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent-soft);
+}
+
+.reactionCount {
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+.reaction.reactionActive .reactionCount { color: var(--accent); }
+
+/* ── Floating action bar ─────────────────────────────────────── */
+.actionBar {
+  position: absolute;
+  top: -16px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 5px;
+  border-radius: var(--radius-md);
+  background: var(--bg-float);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s var(--ease), transform 0.12s var(--ease);
+  transform: translateY(3px);
+  z-index: 5;
+}
+
+.message:hover .actionBar {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-xs);
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 15px;
+  cursor: pointer;
+  padding: 0;
+  transition: var(--transition-fast);
+}
+
+.actionBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.actionBtn.danger:hover {
+  background: var(--dnd-soft);
+  color: var(--dnd);
+}
+
+.actionSep {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+/* ── Bookmark button ─────────────────────────────────────────── */
+.bookmarkBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  font-size: 11.5px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.bookmarkBtn:hover {
+  border-color: var(--idle);
+  color: var(--idle);
+}
+
+.bookmarkBtn.bookmarkActive {
+  border-color: var(--idle-border);
+  color: var(--idle);
+  background: var(--idle-soft);
+}
+
+/* ── Date divider ────────────────────────────────────────────── */
+.dateDivider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 4px 14px;
+}
+
+.dateDividerLine {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+.dateDividerText {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Loading skeleton ────────────────────────────────────────── */
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to   { background-position: 200% center; }
+}
+
+.skeleton {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px 4px;
+}
+
+.skeletonAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(90deg, var(--bg-float) 25%, var(--bg-hover) 50%, var(--bg-float) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.skeletonBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.skeletonLine {
+  height: 12px;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(90deg, var(--bg-float) 25%, var(--bg-hover) 50%, var(--bg-float) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.skeletonLine:nth-child(2) {
+  height: 8px;
+  width: 60%;
+  animation-delay: 0.15s;
+}

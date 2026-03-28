@@ -20,6 +20,24 @@ export const setAuthToken = (token: string | null) => {
   }
 };
 
+// ── Global 401 interceptor ───────────────────────────────────
+// App.tsx registers a callback here; any 401 anywhere triggers it.
+let _onAuthFailure: (() => void) | null = null;
+
+export function setAuthFailureHandler(cb: () => void) {
+  _onAuthFailure = cb;
+}
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err?.response?.status === 401 && _onAuthFailure) {
+      _onAuthFailure();
+    }
+    return Promise.reject(err);
+  },
+);
+
 /** Turns axios/fetch failures into a short message users can act on. */
 export function getApiErrorMessage(err: unknown, fallback: string): string {
   const ax = err as {

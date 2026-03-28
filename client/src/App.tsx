@@ -2,30 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
-import { format } from "date-fns";
 import {
-  Phone,
-  Search,
-  Video,
-  CalendarClock,
-  Link2,
-  LogOut,
   Sparkles,
   BarChart3,
   Star,
   BookOpen,
   Timer,
   Vote,
-  Tag,
   FileText,
-  UserPlus,
 } from "lucide-react";
-import { api, getApiErrorMessage, setAuthToken } from "./lib/api";
+import { api, getApiErrorMessage, setAuthToken, setAuthFailureHandler } from "./lib/api";
 import type {
   AnalyticsSummary,
   ChannelRow,
   LeaderboardRow,
-  Message,
+  Message as MessageType,
   MessageCategory,
   NoteRow,
   Poll,
@@ -38,19 +29,20 @@ import type {
 import { ChannelSidebar, type ListFilter } from "./components/ChannelSidebar";
 import { EmptyChatState } from "./components/EmptyChatState";
 import { GlobalSearchModal } from "./components/GlobalSearchModal";
+import { ServerRail } from "./components/ServerRail";
+import { ChatHeader } from "./components/ChatHeader";
+import { Message, MessageSkeleton } from "./components/Message";
+import { MessageInput } from "./components/MessageInput";
+import { MembersPanel } from "./components/MembersPanel";
 import { JoinCallPage, ScheduledCallPage } from "./pages/CallPages";
 import {
   EXAMPLE_GROUPS,
   hinglishChatHints,
   INDIAN_NAMES,
-  presenceLine,
-  reactionEmojis,
   ui,
   st,
   type AppLocale,
 } from "./content/hinglish";
-import { MemberAvatar } from "./components/MemberAvatar";
-
 let socket: Socket | null = null;
 const DEMO_MODE = false;
 
@@ -71,11 +63,6 @@ function pollVoteCounts(poll: Poll) {
   return m;
 }
 
-function receiptLabel(status?: Message["receiptStatus"]) {
-  if (status === "SEEN") return { text: "✓✓", className: "text-sky-400" };
-  if (status === "DELIVERED") return { text: "✓✓", className: "text-slate-500" };
-  return { text: "✓", className: "text-slate-600" };
-}
 
 function MainApp() {
   const navigate = useNavigate();
@@ -85,7 +72,7 @@ function MainApp() {
   const [servers, setServers] = useState<Server[]>([]);
   const [channels, setChannels] = useState<ChannelRow[]>([]);
   const [members, setMembers] = useState<ServerMember[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<MessageType[]>([]);
   const [activeServer, setActiveServer] = useState<string>("");
   const [activeChannel, setActiveChannel] = useState<string>("");
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -127,7 +114,7 @@ function MainApp() {
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptionsText, setPollOptionsText] = useState("8 PM, 9 PM");
   const [savedOpen, setSavedOpen] = useState(false);
-  const [savedMessages, setSavedMessages] = useState<Message[]>([]);
+  const [savedMessages, setSavedMessages] = useState<MessageType[]>([]);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsSummary | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
@@ -137,7 +124,16 @@ function MainApp() {
   const [noteTitle, setNoteTitle] = useState("");
   const [noteUploading, setNoteUploading] = useState(false);
   const [summarizingChat, setSummarizingChat] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(true);
+  /** userId → { channelId, channelName } for the voice channel they're in */
+  const [voiceMembers, setVoiceMembers] = useState<Record<string, { channelId: string; channelName: string }>>({});
+  /** userId currently speaking (via VAD/WebRTC event from server) */
+  const [speakingUserId, setSpeakingUserId] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  /** id of the newest socket message (gets isNew animation) */
+  const [newestMessageId, setNewestMessageId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const activeChannelRef = useRef(activeChannel);
   const activeServerRef = useRef(activeServer);
@@ -225,26 +221,38 @@ function MainApp() {
     if (st?.serverId || st?.channelId) navigate(location.pathname, { replace: true, state: {} });
   }, [location.state, location.pathname, navigate]);
 
+  // Register the global 401 → auto-logout handler once per mount
+  useEffect(() => {
+    const logout = () => { setAuthToken(null); setToken(null); };
+    setAuthFailureHandler(logout);
+  }, []);
+
   useEffect(() => {
     if (DEMO_MODE) return;
     if (!token) return;
     setAuthToken(token);
-    api.get("/api/auth/me").then((res) => setUser(res.data));
+    // If the token is stale/invalid, auto-logout instead of showing a broken shell
+    api.get("/api/auth/me")
+      .then((res) => setUser(res.data))
+      .catch(() => { /* interceptor already handles 401 → logout */ });
     api.get("/api/servers").then((res) => setServers(res.data));
     const socketUrl =
       import.meta.env.VITE_API_URL || (import.meta.env.DEV ? window.location.origin : "http://localhost:4000");
     socket = io(socketUrl, { auth: { token } });
-    socket.on("message:new", (message: Message) => {
+    socket.on("message:new", (message: MessageType) => {
       const chId = message.channelId;
       if (chId && chId === activeChannelRef.current) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === message.id)) return prev;
           return [message, ...prev];
         });
+        setNewestMessageId(message.id);
+        // Scroll to the new message
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 80);
       }
       scheduleRefetchChannels();
     });
-    socket.on("message:updated", (updated: Message) =>
+    socket.on("message:updated", (updated: MessageType) =>
       setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m))),
     );
     socket.on("message:deleted", ({ id }: { id: string }) =>
@@ -264,6 +272,30 @@ function MainApp() {
         prev.map((m) => (m.id === p.userId ? { ...m, isOnline: p.isOnline, lastSeenAt: p.lastSeenAt } : m)),
       );
       setUser((u) => (u && u.id === p.userId ? { ...u, isOnline: p.isOnline, lastSeenAt: p.lastSeenAt } : u));
+    });
+    socket.on("voice:joined", (p: { userId: string; channelId?: string; channelName: string }) => {
+      // Prefer channelId from payload; fall back to matching by name in current channels list
+      setVoiceMembers((prev) => ({
+        ...prev,
+        [p.userId]: {
+          channelId: p.channelId ?? "",
+          channelName: p.channelName,
+        },
+      }));
+    });
+    socket.on("voice:left", (p: { userId: string }) => {
+      setVoiceMembers((prev) => {
+        const next = { ...prev };
+        delete next[p.userId];
+        return next;
+      });
+      setSpeakingUserId((cur) => (cur === p.userId ? null : cur));
+    });
+    socket.on("voice:speaking", (p: { userId: string }) => {
+      setSpeakingUserId(p.userId);
+    });
+    socket.on("voice:speaking:stop", (p: { userId: string }) => {
+      setSpeakingUserId((cur) => (cur === p.userId ? null : cur));
     });
     socket.on("server:channel-activity", () => {
       scheduleRefetchChannels();
@@ -368,7 +400,7 @@ function MainApp() {
       .then((r) => setStreakInfo(r.data))
       .catch(() => undefined);
     api
-      .get<Message[]>("/api/bookmarks")
+      .get<MessageType[]>("/api/bookmarks")
       .then((r) => setBookmarkedIds(new Set(r.data.map((m) => m.id))))
       .catch(() => undefined);
   }, [token]);
@@ -466,7 +498,7 @@ function MainApp() {
     }
   };
 
-  const mergeSahayakMessages = (data: { userMessage?: Message; botMessage: Message }) => {
+  const mergeSahayakMessages = (data: { userMessage?: MessageType; botMessage: MessageType }) => {
     setMessages((prev) => {
       let x = prev;
       if (data.userMessage && !x.some((m) => m.id === data.userMessage!.id)) x = [data.userMessage!, ...x];
@@ -480,7 +512,7 @@ function MainApp() {
     setSummarizingChat(true);
     setActionError(null);
     try {
-      const { data } = await api.post<{ botMessage: Message }>(`/api/channels/${activeChannel}/sahayak`, {
+      const { data } = await api.post<{ botMessage: MessageType }>(`/api/channels/${activeChannel}/sahayak`, {
         summarize: true,
       });
       if (data.botMessage) mergeSahayakMessages({ botMessage: data.botMessage });
@@ -502,7 +534,7 @@ function MainApp() {
       setUploading(true);
       try {
         const promptClean = rawText.replace(/@sahayak\b/gi, "").replace(/\s+/g, " ").trim();
-        const { data } = await api.post<{ userMessage?: Message; botMessage: Message }>(
+        const { data } = await api.post<{ userMessage?: MessageType; botMessage: MessageType }>(
           `/api/channels/${activeChannel}/sahayak`,
           {
             userMessage: rawText,
@@ -542,7 +574,7 @@ function MainApp() {
     }
 
     try {
-      const { data } = await api.post<Message>(`/api/channels/${activeChannel}/messages`, {
+      const { data } = await api.post<MessageType>(`/api/channels/${activeChannel}/messages`, {
         content: messageText.trim() || "Attachment",
         ...(fileUrl ? { fileUrl } : {}),
         ...(messageSendCategory && messageSendCategory !== "UNCATEGORIZED" ? { category: messageSendCategory } : {}),
@@ -578,12 +610,17 @@ function MainApp() {
   };
 
   const fetchMessages = async (channelId: string, search?: string) => {
-    const p = new URLSearchParams();
-    if (search?.trim()) p.set("q", search.trim());
-    if (categoryFilter) p.set("category", categoryFilter);
-    const qs = p.toString();
-    const res = await api.get(`/api/channels/${channelId}/messages${qs ? `?${qs}` : ""}`);
-    setMessages(res.data.items);
+    setMessagesLoading(true);
+    try {
+      const p = new URLSearchParams();
+      if (search?.trim()) p.set("q", search.trim());
+      if (categoryFilter) p.set("category", categoryFilter);
+      const qs = p.toString();
+      const res = await api.get(`/api/channels/${channelId}/messages${qs ? `?${qs}` : ""}`);
+      setMessages(res.data.items);
+    } finally {
+      setMessagesLoading(false);
+    }
   };
 
   const myMemberId = useMemo(() => members.find((m) => m.id === user?.id)?.memberId, [members, user?.id]);
@@ -595,7 +632,7 @@ function MainApp() {
     setActionError(null);
     const q = aiQuestion.trim();
     try {
-      const { data } = await api.post<{ userMessage?: Message; botMessage: Message }>(
+      const { data } = await api.post<{ userMessage?: MessageType; botMessage: MessageType }>(
         `/api/channels/${activeChannel}/sahayak`,
         { userMessage: `@sahayak ${q}`, prompt: q },
       );
@@ -660,7 +697,7 @@ function MainApp() {
   const openSaved = () => {
     setSavedOpen(true);
     api
-      .get<Message[]>("/api/bookmarks")
+      .get<MessageType[]>("/api/bookmarks")
       .then((r) => {
         setSavedMessages(r.data);
         setBookmarkedIds(new Set(r.data.map((m) => m.id)));
@@ -785,7 +822,6 @@ function MainApp() {
     }
   };
 
-  const isImageUrl = (url: string) => /\.(png|jpe?g|gif|webp|svg)$/i.test(url);
 
   const copyJoinCallLink = () => {
     if (!activeServer || !activeChannel) return;
@@ -867,46 +903,31 @@ function MainApp() {
   }
 
   return (
-    <main className="flex h-screen flex-col bg-[#0b0c0f] text-white">
-      {backendBanner}
-      {actionError && (
-        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-red-900/50 bg-red-950/80 px-4 py-2 text-sm text-red-100">
-          <span>{actionError}</span>
-          <button type="button" className="shrink-0 underline" onClick={() => setActionError(null)}>
-            {ui.dismiss}
-          </button>
-        </div>
-      )}
-      <div className="flex min-h-0 flex-1">
-      <aside className="flex w-[72px] shrink-0 flex-col gap-2 border-r border-slate-800 bg-[#0a0a0b] p-2">
-        <button type="button" className="btn w-full rounded-xl py-2 text-lg font-bold shadow-lg shadow-indigo-900/20" onClick={createServer} title={ui.createServerTitle}>
-          +
-        </button>
-        <button
-          type="button"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#1E1F22] text-slate-200 transition hover:bg-emerald-700/80 hover:text-white"
-          onClick={() => void joinServerWithInvite()}
-          title={ui.joinServerTitle}
-        >
-          <UserPlus className="h-5 w-5" />
-        </button>
-        <div className="flex flex-1 flex-col gap-1.5 overflow-y-auto">
-          {servers.map((s) => (
-            <button
-              type="button"
-              key={s.id}
-              onClick={() => setActiveServer(s.id)}
-              title={s.name}
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold transition-all duration-200 ${
-                activeServer === s.id ? "bg-indigo-600 text-white shadow-md" : "bg-[#1E1F22] text-slate-200 hover:rounded-xl hover:bg-indigo-600/80"
-              }`}
-            >
-              {s.name.slice(0, 2).toUpperCase()}
+    <main className={`app-shell${membersOpen ? "" : " no-members"}`}>
+      {/* ── Banner row — spans all 4 columns ── */}
+      <div className="app-shell-banner">
+        {backendBanner}
+        {actionError && (
+          <div className="flex items-center justify-between gap-2 border-b border-red-900/50 bg-red-950/80 px-4 py-2 text-sm text-red-100">
+            <span>{actionError}</span>
+            <button type="button" className="shrink-0 underline" onClick={() => setActionError(null)}>
+              {ui.dismiss}
             </button>
-          ))}
-        </div>
-      </aside>
+          </div>
+        )}
+      </div>
 
+      {/* ── Rail — 72px server icon column ── */}
+      <ServerRail
+        servers={servers}
+        activeServerId={activeServer}
+        currentUser={user}
+        onSelectServer={setActiveServer}
+        onAddServer={createServer}
+        onJoinServer={() => void joinServerWithInvite()}
+      />
+
+      {/* ── Sidebar — 240px channel list column ── */}
       {activeServer ? (
         <ChannelSidebar
           serverName={serverName}
@@ -928,196 +949,116 @@ function MainApp() {
           onToggleFavorite={toggleFavorite}
           onOpenGlobalSearch={() => setGlobalSearchOpen(true)}
           onCreateChannel={createChannel}
+          currentUser={user}
+          voiceMembers={voiceMembers}
+          speakingUserId={speakingUserId}
+          className="app-shell-sidebar"
         />
       ) : (
-        <aside className="flex w-[320px] items-center justify-center border-r border-slate-800 bg-[#111214] text-slate-500">
+        <aside className="app-shell-sidebar" style={{ display: "flex", alignItems: "center", justifyContent: "center", borderRight: "1px solid var(--border)", background: "var(--bg-deep)", color: "var(--text-3)", fontSize: 13 }}>
           {ui.selectServer}
         </aside>
       )}
 
-      <section className="flex min-w-0 flex-1 flex-col bg-[#313338]">
-        <header className="flex shrink-0 flex-col border-b border-slate-700/80">
-          <div className="flex h-14 items-center justify-between gap-3 px-4">
-            <div className="flex min-w-0 items-center gap-3">
-              {activeChannel ? (
-                <>
-                  <p className="truncate text-sm font-medium text-slate-100">
-                    {activeChannelType === "VOICE" ? ui.voice : "#"} {channels.find((c) => c.id === activeChannel)?.name}
-                  </p>
-                  <div className="hidden items-center gap-1 sm:flex">
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 rounded-lg bg-[#2B2D31] px-2 py-1.5 text-xs text-slate-200 transition hover:bg-[#3f4248]"
-                      onClick={() => startVoiceSession(false)}
-                      disabled={!activeChannel}
-                    >
-                      <Phone className="h-3.5 w-3.5" /> {ui.call}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 rounded-lg bg-[#2B2D31] px-2 py-1.5 text-xs text-slate-200 transition hover:bg-[#3f4248]"
-                      onClick={() => startVoiceSession(true)}
-                      disabled={!activeChannel}
-                    >
-                      <Video className="h-3.5 w-3.5" /> {ui.video}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 rounded-lg bg-[#2B2D31] px-2 py-1.5 text-xs text-slate-200 transition hover:bg-[#3f4248]"
-                      onClick={copyJoinCallLink}
-                      disabled={!activeChannel}
-                    >
-                      <Link2 className="h-3.5 w-3.5" /> {ui.link}
-                    </button>
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 rounded-lg bg-[#2B2D31] px-2 py-1.5 text-xs text-slate-200 transition hover:bg-[#3f4248]"
-                      onClick={() => setScheduleOpen(true)}
-                    >
-                      <CalendarClock className="h-3.5 w-3.5" /> {ui.schedule}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-slate-400">{ui.noChannel}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {streakInfo != null && (
-                <span
-                  className="hidden rounded-full bg-orange-950/80 px-2 py-0.5 text-[11px] font-medium text-orange-200 sm:inline"
-                  title={st(locale, "streak")}
-                >
-                  🔥 {streakInfo.streakCurrent} · {Math.round(streakInfo.studyMinutesTotal)}m
-                </span>
-              )}
-              {scheduledCalls.length > 0 && (
-                <span className="hidden text-xs text-slate-500 md:inline">
-                  {scheduledCalls.length} {ui.upcoming}
-                </span>
-              )}
-              {user && (
-                <div className="hidden max-w-[160px] shrink-0 text-right text-[11px] leading-tight text-slate-400 lg:block">
-                  <span className="block truncate font-medium text-slate-200">{user.name}</span>
-                  <span>{presenceLine(user.isOnline, user.lastSeenAt)}</span>
-                </div>
-              )}
-              <div className="relative flex items-center">
-                <Search className="pointer-events-none absolute left-2 h-4 w-4 text-slate-500" />
-                <input
-                  className="input h-9 w-44 border-slate-600 bg-[#1E1F22] pl-8 text-xs md:w-56"
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  placeholder={ui.searchChannel}
-                  disabled={!activeChannel}
-                />
-              </div>
-              <button
-                type="button"
-                className={`rounded px-2 py-1 text-[10px] uppercase ${locale === "hinglish" ? "bg-teal-900/50 text-teal-100" : "text-slate-500"}`}
-                onClick={() => setLocale("hinglish")}
+      {/* ── Chat — 1fr main content column ── */}
+      <section className="app-shell-chat">
+        <ChatHeader
+          channelName={channels.find((c) => c.id === activeChannel)?.name}
+          channelType={activeChannelType}
+          searchText={searchText}
+          onSearchChange={setSearchText}
+          membersOpen={membersOpen}
+          onToggleMembers={() => setMembersOpen((v) => !v)}
+          streakInfo={streakInfo}
+          scheduledCallsCount={scheduledCalls.length}
+          locale={locale}
+          onSetLocale={setLocale}
+          onLogout={() => { setAuthToken(null); setToken(null); }}
+          noChannelLabel={ui.noChannel}
+          onStartCall={() => startVoiceSession(false)}
+          onStartVideo={() => startVoiceSession(true)}
+        />
+
+        {/* ── Sub-toolbar (category filters + AI actions) ── */}
+        {activeChannel && activeChannelType === "TEXT" && (
+          <div style={{
+            display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6,
+            borderBottom: "1px solid var(--border)", background: "var(--bg-surface)",
+            padding: "6px 16px", flexShrink: 0,
+          }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text-3)" }}>
+              <span>{st(locale, "filterCategory")}</span>
+              <select
+                style={{ borderRadius: "var(--radius-xs)", border: "1px solid var(--border)", background: "var(--bg-raised)", padding: "2px 6px", fontSize: 11, color: "var(--text-1)", outline: "none" }}
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value as MessageCategory | "")}
               >
-                HI
-              </button>
-              <button
-                type="button"
-                className={`rounded px-2 py-1 text-[10px] uppercase ${locale === "english" ? "bg-teal-900/50 text-teal-100" : "text-slate-500"}`}
-                onClick={() => setLocale("english")}
-              >
-                EN
-              </button>
-              <button
-                className="flex items-center gap-1 rounded-lg border border-slate-600 px-2 py-1.5 text-xs text-slate-300 hover:bg-[#2B2D31]"
-                onClick={() => {
-                  setAuthToken(null);
-                  setToken(null);
-                }}
-              >
-                <LogOut className="h-3.5 w-3.5" /> {ui.logout}
-              </button>
-            </div>
+                <option value="">{st(locale, "allCats")}</option>
+                <option value="STUDY">{st(locale, "studyOnly")}</option>
+                <option value="PLACEMENT">Placement</option>
+                <option value="CASUAL">Casual</option>
+                <option value="UNCATEGORIZED">—</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              style={{ display: "flex", alignItems: "center", gap: 4, borderRadius: "var(--radius-sm)", background: "var(--accent-soft)", padding: "3px 8px", fontSize: 11, color: "var(--accent)", border: "1px solid var(--border-lit)", cursor: "pointer", opacity: summarizingChat ? 0.5 : 1 }}
+              onClick={() => void summarizeSahayak()}
+              disabled={summarizingChat}
+            >
+              <FileText size={12} /> {summarizingChat ? st(locale, "summarizing") : st(locale, "summarizeChat")}
+            </button>
+            <button
+              type="button"
+              style={{ display: "flex", alignItems: "center", gap: 4, borderRadius: "var(--radius-sm)", background: "var(--accent-soft)", padding: "3px 8px", fontSize: 11, color: "var(--accent-2)", border: "1px solid rgba(167,139,250,0.2)", cursor: "pointer" }}
+              onClick={() => setAiOpen(true)}
+            >
+              <Sparkles size={12} /> {st(locale, "askAi")}
+            </button>
+            <button
+              type="button"
+              style={{ display: "flex", alignItems: "center", gap: 4, borderRadius: "var(--radius-sm)", background: "var(--bg-raised)", padding: "3px 8px", fontSize: 11, color: "var(--text-2)", border: "1px solid var(--border)", cursor: "pointer" }}
+              onClick={() => setPollOpen(true)}
+            >
+              <Vote size={12} /> {st(locale, "poll")}
+            </button>
+            <button
+              type="button"
+              style={{ display: "flex", alignItems: "center", gap: 4, borderRadius: "var(--radius-sm)", background: "var(--online-soft)", padding: "3px 8px", fontSize: 11, color: "var(--online)", border: "1px solid var(--online-border)", cursor: "pointer" }}
+              onClick={startStudySession}
+            >
+              <Timer size={12} /> {st(locale, "studyStart")}
+            </button>
+            <button
+              type="button"
+              style={{ display: "flex", alignItems: "center", gap: 4, borderRadius: "var(--radius-sm)", background: centerPanel === "notes" ? "var(--idle-soft)" : "var(--bg-raised)", padding: "3px 8px", fontSize: 11, color: centerPanel === "notes" ? "var(--idle)" : "var(--text-2)", border: "1px solid var(--border)", cursor: "pointer" }}
+              onClick={() => setCenterPanel((p) => (p === "notes" ? "chat" : "notes"))}
+            >
+              <BookOpen size={12} /> {st(locale, "notes")}
+            </button>
+            <button
+              type="button"
+              style={{ display: "flex", alignItems: "center", gap: 4, borderRadius: "var(--radius-sm)", background: "var(--bg-raised)", padding: "3px 8px", fontSize: 11, color: "var(--text-2)", border: "1px solid var(--border)", cursor: "pointer" }}
+              onClick={openSaved}
+            >
+              <Star size={12} /> {st(locale, "saved")}
+            </button>
+            <button
+              type="button"
+              style={{ display: "flex", alignItems: "center", gap: 4, borderRadius: "var(--radius-sm)", background: "var(--bg-raised)", padding: "3px 8px", fontSize: 11, color: "var(--text-2)", border: "1px solid var(--border)", cursor: "pointer" }}
+              onClick={openAnalytics}
+            >
+              <BarChart3 size={12} /> {st(locale, "analytics")}
+            </button>
+            <button
+              type="button"
+              style={{ borderRadius: "var(--radius-sm)", background: "var(--badge-placement-bg)", padding: "3px 8px", fontSize: 11, color: "var(--badge-placement)", border: "1px solid rgba(167,139,250,0.15)", cursor: "pointer" }}
+              onClick={() => { setCategoryFilter("PLACEMENT"); setCenterPanel("chat"); }}
+            >
+              {st(locale, "placementHub")}
+            </button>
           </div>
-          {activeChannel && activeChannelType === "TEXT" && (
-            <div className="flex flex-wrap items-center gap-2 border-t border-slate-800/80 px-4 py-2">
-              <label className="flex items-center gap-1 text-[11px] text-slate-400">
-                <span>{st(locale, "filterCategory")}</span>
-                <select
-                  className="rounded border border-slate-600 bg-[#1E1F22] px-2 py-1 text-xs text-slate-200"
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value as MessageCategory | "")}
-                >
-                  <option value="">{st(locale, "allCats")}</option>
-                  <option value="STUDY">{st(locale, "studyOnly")}</option>
-                  <option value="PLACEMENT">Placement</option>
-                  <option value="CASUAL">Casual</option>
-                  <option value="UNCATEGORIZED">—</option>
-                </select>
-              </label>
-              <button
-                type="button"
-                className="flex items-center gap-1 rounded-lg bg-violet-900/50 px-2 py-1 text-xs text-violet-100 hover:bg-violet-800/50 disabled:opacity-50"
-                onClick={() => void summarizeSahayak()}
-                disabled={summarizingChat}
-              >
-                <FileText className="h-3.5 w-3.5" /> {summarizingChat ? st(locale, "summarizing") : st(locale, "summarizeChat")}
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-1 rounded-lg bg-indigo-900/40 px-2 py-1 text-xs text-indigo-100 hover:bg-indigo-800/50"
-                onClick={() => setAiOpen(true)}
-              >
-                <Sparkles className="h-3.5 w-3.5" /> {st(locale, "askAi")}
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-1 rounded-lg bg-[#2B2D31] px-2 py-1 text-xs text-slate-200 hover:bg-[#3f4248]"
-                onClick={() => setPollOpen(true)}
-              >
-                <Vote className="h-3.5 w-3.5" /> {st(locale, "poll")}
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-1 rounded-lg bg-emerald-900/30 px-2 py-1 text-xs text-emerald-100 hover:bg-emerald-800/40"
-                onClick={startStudySession}
-              >
-                <Timer className="h-3.5 w-3.5" /> {st(locale, "studyStart")}
-              </button>
-              <button
-                type="button"
-                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs ${
-                  centerPanel === "notes" ? "bg-amber-900/50 text-amber-100" : "bg-[#2B2D31] text-slate-200 hover:bg-[#3f4248]"
-                }`}
-                onClick={() => setCenterPanel((p) => (p === "notes" ? "chat" : "notes"))}
-              >
-                <BookOpen className="h-3.5 w-3.5" /> {st(locale, "notes")}
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-1 rounded-lg bg-[#2B2D31] px-2 py-1 text-xs text-slate-200 hover:bg-[#3f4248]"
-                onClick={openSaved}
-              >
-                <Star className="h-3.5 w-3.5" /> {st(locale, "saved")}
-              </button>
-              <button
-                type="button"
-                className="flex items-center gap-1 rounded-lg bg-[#2B2D31] px-2 py-1 text-xs text-slate-200 hover:bg-[#3f4248]"
-                onClick={openAnalytics}
-              >
-                <BarChart3 className="h-3.5 w-3.5" /> {st(locale, "analytics")}
-              </button>
-              <button
-                type="button"
-                className="rounded-lg bg-violet-900/30 px-2 py-1 text-xs text-violet-100 hover:bg-violet-800/40"
-                onClick={() => {
-                  setCategoryFilter("PLACEMENT");
-                  setCenterPanel("chat");
-                }}
-              >
-                {st(locale, "placementHub")}
-              </button>
-            </div>
-          )}
-        </header>
+        )}
 
         {!activeChannel ? (
           <EmptyChatState
@@ -1127,61 +1068,61 @@ function MainApp() {
             onCreateServer={createServer}
           />
         ) : centerPanel === "notes" && activeChannelType === "TEXT" ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-slate-200">{st(locale, "notes")}</h2>
-              <button type="button" className="text-xs text-indigo-300 hover:underline" onClick={() => setCenterPanel("chat")}>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", padding: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14, color: "var(--text-1)" }}>{st(locale, "notes")}</h2>
+              <button type="button" style={{ fontSize: 12, color: "var(--accent)", background: "none", border: "none", cursor: "pointer" }} onClick={() => setCenterPanel("chat")}>
                 ← {st(locale, "chat")}
               </button>
             </div>
-            <form onSubmit={uploadNote} className="rounded-xl border border-slate-600 bg-[#2B2D31] p-4 space-y-2">
-              <p className="text-xs font-medium text-slate-300">{st(locale, "uploadNote")}</p>
+            <form onSubmit={uploadNote} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg-raised)", padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+              <p style={{ fontSize: 12, fontWeight: 500, color: "var(--text-2)" }}>{st(locale, "uploadNote")}</p>
               <input
-                className="input w-full"
+                className="input"
                 value={noteTitle}
                 onChange={(e) => setNoteTitle(e.target.value)}
                 placeholder={st(locale, "noteTitle")}
                 required
               />
-              <input name="noteFile" type="file" accept=".pdf,.doc,.docx,application/pdf" className="text-xs text-slate-300" />
-              <button type="submit" className="btn text-sm" disabled={noteUploading}>
+              <input name="noteFile" type="file" accept=".pdf,.doc,.docx,application/pdf" style={{ fontSize: 12, color: "var(--text-3)" }} />
+              <button type="submit" className="btn" disabled={noteUploading}>
                 {noteUploading ? ui.uploading : ui.save}
               </button>
             </form>
-            <ul className="space-y-3">
+            <ul style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {notes.map((n) => (
-                <li key={n.id} className="rounded-xl border border-slate-600 bg-[#2B2D31] p-3">
-                  <p className="font-medium text-slate-100">{n.title}</p>
-                  <p className="text-[11px] text-slate-500">
+                <li key={n.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg-raised)", padding: 12 }}>
+                  <p style={{ fontWeight: 600, color: "var(--text-1)", fontSize: 13 }}>{n.title}</p>
+                  <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
                     {n.uploadedBy.name}
                     {n.channel?.name ? ` · #${n.channel.name}` : ""}
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <a className="text-xs text-indigo-300 hover:underline" href={n.fileUrl} target="_blank" rel="noreferrer">
+                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    <a style={{ fontSize: 12, color: "var(--accent)" }} href={n.fileUrl} target="_blank" rel="noreferrer">
                       {ui.openAttachment}
                     </a>
                     {n.mimeType?.includes("pdf") || n.fileUrl.toLowerCase().includes(".pdf") ? (
-                      <span className="text-xs text-slate-500">{st(locale, "previewNote")} (PDF)</span>
+                      <span style={{ fontSize: 12, color: "var(--text-3)" }}>{st(locale, "previewNote")} (PDF)</span>
                     ) : null}
                   </div>
                   {n.mimeType?.includes("pdf") || n.fileUrl.toLowerCase().includes(".pdf") ? (
-                    <iframe title={n.title} src={n.fileUrl} className="mt-2 h-64 w-full rounded-lg border border-slate-700 bg-white" />
+                    <iframe title={n.title} src={n.fileUrl} style={{ marginTop: 8, height: 256, width: "100%", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "#fff" }} />
                   ) : null}
                 </li>
               ))}
             </ul>
-            {notes.length === 0 && <p className="text-sm text-slate-500">No notes yet — upload PDFs or docs for the group.</p>}
+            {notes.length === 0 && <p style={{ fontSize: 13, color: "var(--text-3)" }}>No notes yet — upload PDFs or docs for the group.</p>}
           </div>
         ) : activeChannelType === "VOICE" ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-slate-400">
-            <p className="text-lg font-medium text-slate-200">{ui.voice}</p>
-            <p className="max-w-sm text-sm">Up se Call / Video dabao ya link copy karo — yahan text chat nahi, sirf voice room.</p>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 32, textAlign: "center", color: "var(--text-3)" }}>
+            <p style={{ fontSize: 17, fontWeight: 600, color: "var(--text-2)" }}>{ui.voice}</p>
+            <p style={{ maxWidth: 340, fontSize: 13, color: "var(--text-3)" }}>Up se Call / Video dabao ya link copy karo — yahan text chat nahi, sirf voice room.</p>
           </div>
         ) : (
           <>
             {studySessions.length > 0 && (
-              <div className="shrink-0 space-y-2 border-b border-slate-700/80 bg-[#232428] px-4 py-3">
-                <p className="text-xs font-medium text-emerald-200/90">{st(locale, "studyActive")}</p>
+              <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 6, borderBottom: "1px solid var(--border)", background: "var(--bg-deep)", padding: "10px 16px" }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: "var(--online)" }}>{st(locale, "studyActive")}</p>
                 {studySessions.map((s) => {
                   const elapsedMin = Math.max(0, (nowTick - new Date(s.startedAt).getTime()) / 60_000);
                   const names = s.participants.map((p) => p.member.user.name).join(", ");
@@ -1190,22 +1131,22 @@ function MainApp() {
                     myMemberId &&
                     (s.creatorMemberId === myMemberId || role === "ADMIN" || role === "MODERATOR");
                   return (
-                    <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-900/50 bg-emerald-950/20 px-3 py-2 text-xs text-slate-200">
+                    <div key={s.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, borderRadius: "var(--radius-sm)", border: "1px solid var(--online-border)", background: "var(--online-soft)", padding: "6px 10px", fontSize: 12, color: "var(--text-1)" }}>
                       <div>
-                        <span className="font-medium">{s.title}</span>
-                        <span className="ml-2 text-slate-400">
+                        <span style={{ fontWeight: 600 }}>{s.title}</span>
+                        <span style={{ marginLeft: 8, color: "var(--text-3)" }}>
                           {Math.floor(elapsedMin)}m / ~{s.plannedMinutes}m
                         </span>
-                        <p className="mt-1 text-[11px] text-slate-500">{names || "—"}</p>
+                        <p style={{ marginTop: 2, fontSize: 11, color: "var(--text-muted)" }}>{names || "—"}</p>
                       </div>
-                      <div className="flex gap-1">
-                        <button type="button" className="rounded bg-emerald-800/60 px-2 py-1 hover:bg-emerald-700/60" onClick={() => joinStudySession(s.id)}>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button type="button" style={{ borderRadius: "var(--radius-xs)", background: "var(--online-soft)", border: "1px solid var(--online-border)", padding: "2px 8px", fontSize: 11, color: "var(--online)", cursor: "pointer" }} onClick={() => joinStudySession(s.id)}>
                           {st(locale, "studyJoin")}
                         </button>
                         {canEnd ? (
                           <button
                             type="button"
-                            className="rounded bg-red-900/40 px-2 py-1 text-red-100 hover:bg-red-800/50"
+                            style={{ borderRadius: "var(--radius-xs)", background: "var(--dnd-soft)", border: "1px solid rgba(248,113,113,0.2)", padding: "2px 8px", fontSize: 11, color: "var(--dnd)", cursor: "pointer" }}
                             onClick={() => endStudySession(s.id)}
                           >
                             {st(locale, "studyEnd")}
@@ -1218,17 +1159,17 @@ function MainApp() {
               </div>
             )}
             {activeChannelType === "TEXT" && polls.length > 0 && (
-              <div className="shrink-0 space-y-2 border-b border-slate-700/80 px-4 py-3">
+              <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, borderBottom: "1px solid var(--border)", padding: "10px 16px" }}>
                 {polls.map((poll) => {
                   const counts = pollVoteCounts(poll);
                   const total = poll.votes.length;
                   return (
-                    <div key={poll.id} className="rounded-xl border border-slate-600 bg-[#2B2D31] p-3">
-                      <p className="text-sm font-medium text-slate-100">{poll.question}</p>
-                      <p className="text-[11px] text-slate-500">
+                    <div key={poll.id} style={{ borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg-raised)", padding: "10px 12px" }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)" }}>{poll.question}</p>
+                      <p style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
                         {poll.member.user.name} · {total} {st(locale, "votes")}
                       </p>
-                      <ul className="mt-2 space-y-1">
+                      <ul style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
                         {poll.options.map((opt) => {
                           const c = counts.get(opt.id) || 0;
                           const pct = total ? Math.round((c / total) * 100) : 0;
@@ -1236,11 +1177,11 @@ function MainApp() {
                             <li key={opt.id}>
                               <button
                                 type="button"
-                                className="w-full rounded-lg bg-[#3a3d43] px-2 py-1.5 text-left text-xs text-slate-100 hover:bg-[#4b4f57]"
+                                style={{ width: "100%", borderRadius: "var(--radius-sm)", background: "var(--bg-float)", padding: "5px 10px", textAlign: "left", fontSize: 12, color: "var(--text-1)", border: "1px solid var(--border)", cursor: "pointer" }}
                                 onClick={() => votePoll(poll.id, opt.id)}
                               >
-                                <span className="font-medium">{opt.text}</span>
-                                <span className="ml-2 text-slate-400">
+                                <span style={{ fontWeight: 500 }}>{opt.text}</span>
+                                <span style={{ marginLeft: 8, color: "var(--text-3)" }}>
                                   {c} ({pct}%)
                                 </span>
                               </button>
@@ -1253,168 +1194,89 @@ function MainApp() {
                 })}
               </div>
             )}
-            <div className="flex-1 space-y-3 overflow-y-auto p-4">
-              {messages.length === 0 && activeChannelType === "TEXT" && (
-                <div className="rounded-xl border border-slate-600/50 bg-[#1E1F22]/80 px-4 py-3 text-sm text-slate-400">
-                  <p className="font-medium text-slate-300">{ui.emptyHintsTitle}</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-                    {hinglishChatHints.slice(0, 6).map((h) => (
-                      <li key={h}>{h}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {activeChannelType === "TEXT" &&
-                messages.map((m) => {
-                  const isSahayak = Boolean(m.isSahayakAi);
-                  const mine = m.member.user.id === user?.id;
-                  const r = receiptLabel(m.receiptStatus);
-                  const displayName = isSahayak
-                    ? st(locale, "sahayakName")
-                    : m.isAiAssistant
-                      ? st(locale, "aiAssistant")
-                      : m.member.user.name;
-                  const botLike = isSahayak || Boolean(m.isAiAssistant);
-                  const cat = m.category || "UNCATEGORIZED";
-                  const catClass =
-                    cat === "STUDY"
-                      ? "bg-sky-900/50 text-sky-100"
-                      : cat === "PLACEMENT"
-                        ? "bg-violet-900/50 text-violet-100"
-                        : cat === "CASUAL"
-                          ? "bg-amber-900/40 text-amber-100"
-                          : "bg-slate-700/50 text-slate-300";
-                  return (
-                    <article
-                      key={m.id}
-                      className={`rounded-xl border p-3 shadow-sm transition ${
-                        isSahayak
-                          ? "border-violet-500/45 bg-gradient-to-br from-violet-950/90 via-indigo-950/65 to-[#1a1628] hover:border-violet-400/50"
-                          : "border-slate-700/40 bg-[#2B2D31] hover:border-slate-600/60"
-                      }`}
-                    >
-                      <div className="flex gap-3">
-                        <MemberAvatar
-                          name={displayName}
-                          imageUrl={botLike ? undefined : m.member.user.imageUrl}
-                          className="h-9 w-9 shrink-0"
+            <div style={{ flex: 1, overflowY: "auto", padding: "8px 0", scrollBehavior: "smooth" }}>
+              {messagesLoading ? (
+                <MessageSkeleton />
+              ) : (
+                <>
+                  {messages.length === 0 && activeChannelType === "TEXT" && (
+                    <div style={{ margin: "16px", padding: "12px 16px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", background: "var(--bg-raised)", fontSize: 13, color: "var(--text-3)" }}>
+                      <p style={{ fontWeight: 600, color: "var(--text-2)", marginBottom: 8 }}>{ui.emptyHintsTitle}</p>
+                      <ul style={{ paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
+                        {hinglishChatHints.slice(0, 6).map((h) => (
+                          <li key={h}>{h}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {activeChannelType === "TEXT" &&
+                    messages.map((m, idx) => {
+                      const prev = messages[idx + 1];
+                      const grouped =
+                        !!prev &&
+                        prev.member.user.id === m.member.user.id &&
+                        Math.abs(
+                          new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime(),
+                        ) < 5 * 60 * 1000;
+
+                      return (
+                        <Message
+                          key={m.id}
+                          message={m}
+                          grouped={grouped}
+                          isMine={m.member.user.id === user?.id}
+                          locale={locale}
+                          bookmarked={bookmarkedIds.has(m.id)}
+                          currentUserId={user?.id}
+                          isNew={m.id === newestMessageId}
+                          msgIndex={idx}
+                          onToggleReaction={(emoji: string) => toggleReaction(m.id, emoji)}
+                          onToggleBookmark={() => toggleBookmark(m.id)}
+                          onTagEdit={() => {
+                            setMetaForMessage(m.id);
+                            setMetaTags((m.tags || []).join(", "));
+                            setMetaCategory((m.category as MessageCategory) || "UNCATEGORIZED");
+                          }}
                         />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-medium text-slate-200">{displayName}</p>
-                              {isSahayak ? (
-                                <span className="rounded bg-violet-600 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
-                                  {st(locale, "aiBadge")}
-                                </span>
-                              ) : null}
-                              <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase ${catClass}`}>{cat}</span>
-                              {m.tags?.map((t) => (
-                                <span key={t} className="rounded bg-slate-600/50 px-1.5 py-0.5 text-[10px] text-slate-200">
-                                  {t}
-                                </span>
-                              ))}
-                            </div>
-                            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                              <span>{format(new Date(m.createdAt), "HH:mm")}</span>
-                              {mine && !botLike && <span className={r.className}>{r.text}</span>}
-                            </div>
-                          </div>
-                          <p className="mt-1 whitespace-pre-wrap text-slate-100">{m.content}</p>
-                          {m.fileUrl && (
-                            <div className="mt-2">
-                              {isImageUrl(m.fileUrl) ? (
-                                <img src={m.fileUrl} alt="" className="max-h-64 rounded-lg border border-slate-700" />
-                              ) : null}
-                              <a className="text-sm text-indigo-300 hover:underline" href={m.fileUrl} target="_blank" rel="noreferrer">
-                                {ui.openAttachment}
-                              </a>
-                            </div>
-                          )}
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            {reactionEmojis.map((emoji) => {
-                              const count = m.reactions?.filter((rx) => rx.emoji === emoji).length || 0;
-                              return (
-                                <button
-                                  key={`${m.id}-${emoji}`}
-                                  type="button"
-                                  className="rounded-full bg-[#3a3d43] px-2.5 py-1 text-xs transition hover:bg-[#4b4f57]"
-                                  onClick={() => toggleReaction(m.id, emoji)}
-                                >
-                                  {emoji} {count > 0 ? count : ""}
-                                </button>
-                              );
-                            })}
-                            <button
-                              type="button"
-                              className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs ${
-                                bookmarkedIds.has(m.id) ? "bg-amber-900/50 text-amber-100" : "bg-[#3a3d43] text-slate-300"
-                              }`}
-                              onClick={() => toggleBookmark(m.id)}
-                            >
-                              <Star className="h-3 w-3" />
-                              {bookmarkedIds.has(m.id) ? st(locale, "unsaveMsg") : st(locale, "saveMsg")}
-                            </button>
-                            <button
-                              type="button"
-                              className="flex items-center gap-1 rounded-full bg-[#3a3d43] px-2 py-1 text-xs text-slate-300 hover:bg-[#4b4f57]"
-                              onClick={() => {
-                                setMetaForMessage(m.id);
-                                setMetaTags((m.tags || []).join(", "));
-                                setMetaCategory((m.category as MessageCategory) || "UNCATEGORIZED");
-                              }}
-                            >
-                              <Tag className="h-3 w-3" /> {st(locale, "tagEdit")}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                      );
+                    })}
+                  <div ref={messagesEndRef} />
+                </>
+              )}
             </div>
-            {typingUser && activeChannelType === "TEXT" && (
-              <div className="px-4 pb-2 text-xs text-slate-400">
-                {typingUser} {ui.typing}
-              </div>
-            )}
             {activeChannelType === "TEXT" && (
-              <form onSubmit={sendMessage} className="flex shrink-0 flex-wrap items-end gap-2 border-t border-slate-700/80 bg-[#313338] p-3">
-                <label className="btn cursor-pointer shrink-0">
-                  {ui.file}
-                  <input type="file" className="hidden" onChange={onSelectFile} />
-                </label>
-                <select
-                  className="input h-10 w-[130px] shrink-0 text-xs"
-                  value={messageSendCategory}
-                  onChange={(e) => setMessageSendCategory(e.target.value as MessageCategory)}
-                  title={st(locale, "categoryLabel")}
-                >
-                  <option value="UNCATEGORIZED">Auto</option>
-                  <option value="STUDY">Study</option>
-                  <option value="PLACEMENT">Placement</option>
-                  <option value="CASUAL">Casual</option>
-                </select>
-                <input
-                  className="input min-w-0 flex-1"
-                  value={messageText}
-                  onChange={(e) => onTyping(e.target.value)}
-                  placeholder={
-                    activeChannel ? `${ui.messagePlaceholder} — ${st(locale, "msgHintSahayak")}` : ui.selectChannelFirst
-                  }
-                />
-                <button className="btn shrink-0" disabled={uploading}>
-                  {uploading ? ui.uploading : ui.send}
-                </button>
-              </form>
-            )}
-            {selectedFile && activeChannelType === "TEXT" && (
-              <div className="px-3 pb-3 text-xs text-slate-400">Selected: {selectedFile.name}</div>
+              <MessageInput
+                channelName={channels.find((c) => c.id === activeChannel)?.name}
+                messageText={messageText}
+                onTyping={onTyping}
+                onSubmit={sendMessage}
+                selectedFile={selectedFile}
+                onSelectFile={onSelectFile}
+                onClearFile={() => setSelectedFile(null)}
+                uploading={uploading}
+                messageSendCategory={messageSendCategory}
+                onSetCategory={setMessageSendCategory}
+                typingUser={typingUser}
+                locale={locale}
+                disabled={!activeChannel}
+              />
             )}
           </>
         )}
       </section>
-      </div>
+
+      {/* ── Members panel — 260px right column ── */}
+      {membersOpen && (
+        <div className="app-shell-members">
+          <MembersPanel
+            members={members}
+            typingUser={typingUser}
+            voiceMembers={Object.fromEntries(
+              Object.entries(voiceMembers).map(([uid, v]) => [uid, v.channelName])
+            )}
+          />
+        </div>
+      )}
 
       <GlobalSearchModal
         open={globalSearchOpen}
