@@ -67,8 +67,8 @@ export function GlobalSearchModal({ open, onClose, serverId, locale = "hinglish"
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-16 px-4" role="dialog">
-      <div className="w-full max-w-lg rounded-xl border border-slate-600 bg-[#2B2D31] shadow-2xl">
+    <div className="app-modal-backdrop app-modal-backdrop--top" role="dialog" onClick={onClose}>
+      <div className="app-modal-sheet app-modal-sheet--flush max-w-lg" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-slate-600 p-3 space-y-2">
           <div className="flex items-center gap-2">
             <input
@@ -98,14 +98,14 @@ export function GlobalSearchModal({ open, onClose, serverId, locale = "hinglish"
               </select>
             </label>
             <input
-              className="input flex-1 min-w-[120px] h-8 text-xs border-slate-600 bg-[#1E1F22]"
+              className="input min-h-0 min-w-0 flex-1 h-8 text-xs border-slate-600 bg-[#1E1F22]"
               placeholder={st(locale, "searchTag")}
               value={searchTag}
               onChange={(e) => setSearchTag(e.target.value)}
             />
           </div>
         </div>
-        <div className="max-h-[min(60vh,420px)] overflow-y-auto p-2 text-sm">
+        <div className="max-h-[min(55dvh,420px)] overflow-y-auto overflow-x-hidden p-2 text-sm">
           {loading && <p className="px-2 py-4 text-slate-400">{searchModal.searching}</p>}
           {!loading && data && (
             <>

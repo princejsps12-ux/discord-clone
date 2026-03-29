@@ -16,8 +16,8 @@ export function JoinCallPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#111214] text-white flex flex-col items-center justify-center p-6">
-      <div className="max-w-md w-full rounded-2xl border border-slate-700 bg-[#2B2D31] p-8 text-center">
+    <main className="page-fullscreen-safe flex flex-col items-center justify-center bg-[#111214] text-white">
+      <div className="page-fullscreen-safe__card rounded-2xl border border-slate-700 bg-[#2B2D31] p-6 text-center sm:p-8">
         <Phone className="mx-auto h-12 w-12 text-emerald-400 mb-4" />
         <h1 className="text-xl font-semibold">{callPages.joinTitle}</h1>
         <p className="mt-2 text-sm text-slate-400">{callPages.joinSub}</p>
@@ -75,7 +75,7 @@ export function ScheduledCallPage() {
 
   if (err) {
     return (
-      <main className="min-h-screen bg-[#111214] text-white flex items-center justify-center p-6">
+      <main className="page-fullscreen-safe flex items-center justify-center bg-[#111214] text-white">
         <p className="text-slate-400">{err}</p>
       </main>
     );
@@ -83,7 +83,7 @@ export function ScheduledCallPage() {
 
   if (!row) {
     return (
-      <main className="min-h-screen bg-[#111214] text-white flex items-center justify-center p-6">
+      <main className="page-fullscreen-safe flex items-center justify-center bg-[#111214] text-white">
         <p className="text-slate-400">{callPages.loading}</p>
       </main>
     );
@@ -92,8 +92,8 @@ export function ScheduledCallPage() {
   const when = new Date(row.scheduledAt);
 
   return (
-    <main className="min-h-screen bg-[#111214] text-white flex flex-col items-center justify-center p-6">
-      <div className="max-w-md w-full rounded-2xl border border-slate-700 bg-[#2B2D31] p-8">
+    <main className="page-fullscreen-safe flex flex-col items-center justify-center bg-[#111214] text-white">
+      <div className="page-fullscreen-safe__card rounded-2xl border border-slate-700 bg-[#2B2D31] p-6 sm:p-8">
         <h1 className="text-xl font-semibold">{row.title || callPages.defaultCallTitle}</h1>
         <p className="mt-2 text-slate-400 text-sm">
           {row.server.name}

@@ -1068,7 +1068,7 @@ function MainApp() {
             onCreateServer={createServer}
           />
         ) : centerPanel === "notes" && activeChannelType === "TEXT" ? (
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", padding: 16 }}>
+          <div className="app-notes-panel">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14, color: "var(--text-1)" }}>{st(locale, "notes")}</h2>
               <button type="button" style={{ fontSize: 12, color: "var(--accent)", background: "none", border: "none", cursor: "pointer" }} onClick={() => setCenterPanel("chat")}>
@@ -1114,14 +1114,14 @@ function MainApp() {
             {notes.length === 0 && <p style={{ fontSize: 13, color: "var(--text-3)" }}>No notes yet — upload PDFs or docs for the group.</p>}
           </div>
         ) : activeChannelType === "VOICE" ? (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 32, textAlign: "center", color: "var(--text-3)" }}>
+          <div className="app-voice-placeholder">
             <p style={{ fontSize: 17, fontWeight: 600, color: "var(--text-2)" }}>{ui.voice}</p>
-            <p style={{ maxWidth: 340, fontSize: 13, color: "var(--text-3)" }}>Up se Call / Video dabao ya link copy karo — yahan text chat nahi, sirf voice room.</p>
+            <p style={{ maxWidth: "min(340px, 100%)", fontSize: 13, color: "var(--text-3)" }}>Up se Call / Video dabao ya link copy karo — yahan text chat nahi, sirf voice room.</p>
           </div>
         ) : (
-          <>
+          <div className="app-chat-body">
             {studySessions.length > 0 && (
-              <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 6, borderBottom: "1px solid var(--border)", background: "var(--bg-deep)", padding: "10px 16px" }}>
+              <div className="app-chat-strip app-chat-strip--deep">
                 <p style={{ fontSize: 11, fontWeight: 600, color: "var(--online)" }}>{st(locale, "studyActive")}</p>
                 {studySessions.map((s) => {
                   const elapsedMin = Math.max(0, (nowTick - new Date(s.startedAt).getTime()) / 60_000);
@@ -1159,7 +1159,7 @@ function MainApp() {
               </div>
             )}
             {activeChannelType === "TEXT" && polls.length > 0 && (
-              <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, borderBottom: "1px solid var(--border)", padding: "10px 16px" }}>
+              <div className="app-chat-strip" style={{ gap: 8 }}>
                 {polls.map((poll) => {
                   const counts = pollVoteCounts(poll);
                   const total = poll.votes.length;
@@ -1194,7 +1194,7 @@ function MainApp() {
                 })}
               </div>
             )}
-            <div style={{ flex: 1, overflowY: "auto", padding: "8px 0", scrollBehavior: "smooth" }}>
+            <div className="app-chat-scroll">
               {messagesLoading ? (
                 <MessageSkeleton />
               ) : (
@@ -1261,9 +1261,18 @@ function MainApp() {
                 disabled={!activeChannel}
               />
             )}
-          </>
+          </div>
         )}
       </section>
+
+      {membersOpen && (
+        <div
+          className="members-backdrop"
+          onClick={() => setMembersOpen(false)}
+          role="presentation"
+          aria-hidden
+        />
+      )}
 
       {/* ── Members panel — 260px right column (fixed overlay on mobile/tablet) ── */}
       <div className={`app-shell-members${membersOpen ? " members-open" : ""}`}>
@@ -1286,13 +1295,13 @@ function MainApp() {
       />
 
       {aiOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="app-modal-backdrop">
           <form
             onSubmit={submitAi}
-            className="w-full max-w-lg rounded-xl border border-slate-600 bg-[#2B2D31] p-6 shadow-xl"
+            className="app-modal-sheet max-w-lg"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-indigo-100">{st(locale, "aiTitle")}</h3>
+            <h3 className="text-lg font-semibold" style={{ color: "var(--text-1)" }}>{st(locale, "aiTitle")}</h3>
             <textarea
               className="input mt-3 min-h-[120px] w-full resize-y"
               value={aiQuestion}
@@ -1312,8 +1321,8 @@ function MainApp() {
       )}
 
       {pollOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <form onSubmit={submitPoll} className="w-full max-w-md rounded-xl border border-slate-600 bg-[#2B2D31] p-6 shadow-xl">
+        <div className="app-modal-backdrop">
+          <form onSubmit={submitPoll} className="app-modal-sheet app-modal-sheet--md">
             <h3 className="text-lg font-semibold">{st(locale, "pollTitle")}</h3>
             <label className="mt-3 block text-sm text-slate-300">
               {st(locale, "pollQ")}
@@ -1336,15 +1345,15 @@ function MainApp() {
       )}
 
       {savedOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-16">
-          <div className="w-full max-w-lg rounded-xl border border-slate-600 bg-[#2B2D31] p-5 shadow-xl">
+        <div className="app-modal-backdrop app-modal-backdrop--top">
+          <div className="app-modal-sheet max-w-lg">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-lg font-semibold">{st(locale, "saved")}</h3>
               <button type="button" className="text-sm text-slate-400 hover:text-white" onClick={() => setSavedOpen(false)}>
                 {ui.dismiss}
               </button>
             </div>
-            <ul className="mt-4 max-h-[60vh] space-y-3 overflow-y-auto text-sm">
+            <ul className="mt-4 max-h-[min(55dvh,420px)] space-y-3 overflow-y-auto overflow-x-hidden text-sm">
               {savedMessages.map((m) => (
                 <li key={m.id} className="rounded-lg border border-slate-600 bg-[#1E1F22] p-3">
                   <p className="text-[11px] text-emerald-400/90">#{m.channel?.name || "?"}</p>
@@ -1368,8 +1377,8 @@ function MainApp() {
       )}
 
       {analyticsOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-12">
-          <div className="w-full max-w-lg rounded-xl border border-slate-600 bg-[#2B2D31] p-5 shadow-xl">
+        <div className="app-modal-backdrop app-modal-backdrop--top">
+          <div className="app-modal-sheet max-w-lg">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-lg font-semibold">{st(locale, "analyticsTitle")}</h3>
               <button type="button" className="text-sm text-slate-400 hover:text-white" onClick={() => setAnalyticsOpen(false)}>
@@ -1425,8 +1434,8 @@ function MainApp() {
       )}
 
       {metaForMessage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-xl border border-slate-600 bg-[#2B2D31] p-6 shadow-xl">
+        <div className="app-modal-backdrop">
+          <div className="app-modal-sheet app-modal-sheet--md">
             <h3 className="text-lg font-semibold">{st(locale, "tagEdit")}</h3>
             <label className="mt-3 block text-sm text-slate-300">
               Tags
@@ -1458,10 +1467,10 @@ function MainApp() {
       )}
 
       {scheduleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="app-modal-backdrop">
           <form
             onSubmit={submitSchedule}
-            className="w-full max-w-md rounded-xl border border-slate-600 bg-[#2B2D31] p-6 shadow-xl"
+            className="app-modal-sheet app-modal-sheet--md"
           >
             <h3 className="text-lg font-semibold">{ui.scheduleCallTitle}</h3>
             <p className="mt-1 text-xs text-slate-400">{ui.scheduleCallSub}</p>
