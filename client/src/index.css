@@ -5,19 +5,25 @@
    Design Tokens
 ══════════════════════════════════════════════════════════════ */
 :root {
-  --bg-void:    #07080b;
-  --bg-deep:    #0c0e13;
-  --bg-surface: #111318;
-  --bg-raised:  #181c24;
-  --bg-float:   #1f2433;
-  --bg-hover:   #252d40;
-  --bg-surface-alpha: rgba(17, 19, 24, 0.88);
+  /* Template B — Neon Discord+ (cyan / magenta electric) */
+  --bg-void:    #050508;
+  --bg-deep:    #090a0f;
+  --bg-surface: #0e1018;
+  --bg-raised:  #141824;
+  --bg-float:   #1a1f2e;
+  --bg-hover:   #222a3d;
+  --bg-surface-alpha: rgba(14, 16, 24, 0.92);
 
-  --accent:      #5b7fff;
-  --accent-dim:  #4a6ee0;
-  --accent-glow: rgba(91, 127, 255, 0.20);
-  --accent-soft: rgba(91, 127, 255, 0.10);
-  --accent-2:    #a78bfa;
+  --neon-cyan:    #22d3ee;
+  --neon-magenta: #e879f9;
+  --neon-violet:  #a855f7;
+
+  --accent:      #22d3ee;
+  --accent-dim:  #06b6d4;
+  --accent-glow: rgba(34, 211, 238, 0.38);
+  --accent-soft: rgba(34, 211, 238, 0.14);
+  --accent-2:    #e879f9;
+  --accent-magenta-soft: rgba(232, 121, 249, 0.14);
 
   --online:        #3dd68c;
   --online-soft:   rgba(61, 214, 140, 0.10);
@@ -36,13 +42,15 @@
   --text-muted: #2e3450;
 
   --border:        rgba(255, 255, 255, 0.045);
-  --border-lit:    rgba(91, 127, 255, 0.30);
+  --border-lit:    rgba(34, 211, 238, 0.35);
+  --border-lit-magenta: rgba(232, 121, 249, 0.28);
   --border-strong: rgba(255, 255, 255, 0.10);
 
-  --shadow-sm:     0 1px 3px rgba(0, 0, 0, 0.40);
-  --shadow-md:     0 4px 16px rgba(0, 0, 0, 0.50);
-  --shadow-lg:     0 8px 32px rgba(0, 0, 0, 0.60);
-  --shadow-accent: 0 4px 24px rgba(91, 127, 255, 0.25);
+  --shadow-sm:     0 1px 3px rgba(0, 0, 0, 0.45);
+  --shadow-md:     0 4px 20px rgba(0, 0, 0, 0.55);
+  --shadow-lg:     0 8px 40px rgba(0, 0, 0, 0.65);
+  --shadow-accent: 0 4px 28px rgba(34, 211, 238, 0.35), 0 0 48px rgba(232, 121, 249, 0.12);
+  --shadow-neon:   0 0 24px rgba(34, 211, 238, 0.22), 0 0 40px rgba(232, 121, 249, 0.10);
 
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -72,8 +80,8 @@
 
   --sahayak-bg:           rgba(109, 40, 217, 0.08);
   --sahayak-bg-hover:     rgba(109, 40, 217, 0.13);
-  --sahayak-accent:       rgba(91, 127, 255, 0.05);
-  --sahayak-accent-hover: rgba(91, 127, 255, 0.08);
+  --sahayak-accent:       rgba(34, 211, 238, 0.06);
+  --sahayak-accent-hover: rgba(232, 121, 249, 0.08);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -116,13 +124,17 @@ img, video { max-width: 100%; display: block; }
 ::-webkit-scrollbar-thumb { background: var(--bg-float); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--bg-hover); }
 
-::selection { background: var(--accent-soft); color: var(--accent); }
+::selection {
+  background: rgba(34, 211, 238, 0.22);
+  color: #ecfeff;
+}
 
 :focus { outline: none; }
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--neon-cyan);
   outline-offset: 2px;
   border-radius: var(--radius-xs);
+  box-shadow: 0 0 12px rgba(232, 121, 249, 0.35);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -154,11 +166,13 @@ img, video { max-width: 100%; display: block; }
   flex-direction: column;
   background: var(--bg-surface);
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(91, 127, 255, 0.08), transparent),
+    radial-gradient(ellipse 55% 45% at 15% 20%, rgba(34, 211, 238, 0.09), transparent),
+    radial-gradient(ellipse 50% 40% at 88% 75%, rgba(232, 121, 249, 0.08), transparent),
+    radial-gradient(ellipse 60% 35% at 50% 100%, rgba(168, 85, 247, 0.06), transparent),
     linear-gradient(var(--border) 1px, transparent 1px),
     linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 100% 100%, 32px 32px, 32px 32px;
-  background-position: 0 0, -0.5px -0.5px, -0.5px -0.5px;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+  background-position: 0 0, 0 0, 0 0, -0.5px -0.5px, -0.5px -0.5px;
   min-width: 0;
 }
 

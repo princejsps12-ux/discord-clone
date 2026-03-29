@@ -3,8 +3,9 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-deep);
+  background: linear-gradient(180deg, var(--bg-deep) 0%, #0a0c14 100%);
   border-right: 1px solid var(--border);
+  box-shadow: inset -1px 0 0 rgba(232, 121, 249, 0.04);
   overflow: hidden;
 }
 
@@ -35,6 +36,7 @@
 .serverBtn:hover {
   background: var(--bg-float);
   border-color: var(--border-lit);
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.06);
 }
 
 .serverName {
@@ -65,11 +67,13 @@
   gap: 5px;
   padding: 4px 8px;
   border-radius: var(--radius-xs);
-  background: linear-gradient(90deg, var(--accent-soft), transparent);
+  background: linear-gradient(90deg, var(--accent-soft), var(--accent-magenta-soft), transparent);
+  border: 1px solid rgba(34, 211, 238, 0.12);
   font-size: 10px;
-  color: var(--accent);
+  color: var(--neon-cyan);
   letter-spacing: 0.3px;
   font-weight: 500;
+  text-shadow: 0 0 12px rgba(232, 121, 249, 0.25);
 }
 
 /* ── Invite row ──────────────────────────────────────────────── */
@@ -165,8 +169,8 @@
 .searchInput::placeholder { color: var(--text-muted); }
 
 .searchInput:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 14px rgba(232, 121, 249, 0.12);
   background: var(--bg-float);
 }
 
@@ -350,11 +354,12 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background: var(--accent);
+  width: 3px;
+  background: linear-gradient(180deg, var(--neon-cyan), var(--neon-magenta));
   border-radius: 0 2px 2px 0;
   transform: scaleY(0);
   transition: transform 0.15s var(--ease-spring);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.45);
 }
 
 .channelItem:hover::before { transform: scaleY(1); }
@@ -366,12 +371,14 @@
 }
 
 .channelItem.channelActive {
-  background: var(--accent-soft);
+  background: linear-gradient(90deg, var(--accent-soft) 0%, var(--accent-magenta-soft) 100%);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.12);
 }
 
 .channelItem.channelActive .channelName {
-  color: var(--accent);
+  color: var(--neon-cyan);
   font-weight: 500;
+  text-shadow: 0 0 20px rgba(232, 121, 249, 0.2);
 }
 
 .channelItem.channelUnread .channelName {
@@ -389,7 +396,8 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--neon-magenta);
+  box-shadow: 0 0 8px var(--neon-magenta);
 }
 
 .channelIcon {
@@ -404,7 +412,7 @@
   text-align: center;
 }
 
-.channelItem.channelActive .channelIcon { color: var(--accent); }
+.channelItem.channelActive .channelIcon { color: var(--neon-cyan); }
 
 .channelName {
   flex: 1;
@@ -694,7 +702,7 @@
     width: 100%;
   }
 
-  .channel {
+  .channelItem {
     min-height: 44px;
     padding: 10px 8px;
   }

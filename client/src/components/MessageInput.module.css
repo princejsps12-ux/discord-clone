@@ -18,10 +18,11 @@
 }
 
 .bar:focus-within {
-  border-color: var(--accent);
+  border-color: rgba(34, 211, 238, 0.45);
   background: var(--bg-float);
   box-shadow:
     0 0 0 3px var(--accent-soft),
+    0 0 20px rgba(232, 121, 249, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
@@ -82,7 +83,7 @@
   height: 34px;
   border-radius: var(--radius-sm);
   border: none;
-  background: var(--accent);
+  background: linear-gradient(145deg, var(--neon-cyan) 0%, var(--neon-violet) 50%, var(--neon-magenta) 100%);
   color: #fff;
   font-size: 14px;
   cursor: pointer;
@@ -93,9 +94,9 @@
 }
 
 .sendBtn:hover:not(:disabled) {
-  background: var(--accent-dim);
+  filter: brightness(1.08);
   transform: scale(1.08);
-  box-shadow: 0 4px 20px rgba(91, 127, 255, 0.45);
+  box-shadow: 0 4px 24px rgba(34, 211, 238, 0.45), 0 0 28px rgba(232, 121, 249, 0.25);
 }
 
 .sendBtn:active:not(:disabled) {
