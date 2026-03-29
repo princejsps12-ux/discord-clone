@@ -5,15 +5,19 @@
 
 /* ── Page wrapper ──────────────────────────────────────────── */
 .page {
-  min-height: 100vh;
-  min-height: 100dvh;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #1e0a40 0%, #3d1580 30%, #5b2d8e 60%, #7b2fbe 85%, #9d4edd 100%);
-  padding: 32px 20px;
+  padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
 }
 
@@ -67,7 +71,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   width: 100%;
-  max-width: 880px;
+  max-width: min(880px, 100%);
   min-height: 540px;
   border-radius: 26px;
   background: #ffffff;

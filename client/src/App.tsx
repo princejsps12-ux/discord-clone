@@ -875,7 +875,7 @@ function MainApp() {
 
   if (!DEMO_MODE && !token) {
     return (
-      <>
+      <div className="app-login-root">
         {backendBanner}
         <LoginPage
           authMode={authMode}
@@ -889,7 +889,7 @@ function MainApp() {
           onSubmit={onAuth}
           onToggleMode={() => setAuthMode((m) => (m === "login" ? "register" : "login"))}
         />
-      </>
+      </div>
     );
   }
 
@@ -985,11 +985,7 @@ function MainApp() {
 
         {/* ── Sub-toolbar (category filters + AI actions) ── */}
         {activeChannel && activeChannelType === "TEXT" && (
-          <div style={{
-            display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6,
-            borderBottom: "1px solid var(--border)", background: "var(--bg-surface)",
-            padding: "6px 16px", flexShrink: 0,
-          }}>
+          <div className="app-sub-toolbar">
             <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text-3)" }}>
               <span>{st(locale, "filterCategory")}</span>
               <select

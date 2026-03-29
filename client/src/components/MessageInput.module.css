@@ -2,6 +2,8 @@
 .wrap {
   flex-shrink: 0;
   padding: 0 16px 16px;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 /* ── Input bar ──────────────────────────────────────────────── */
@@ -227,9 +229,16 @@
    Responsive — Mobile (<768px)
 ══════════════════════════════════════════════════════════════ */
 @media (max-width: 767px) {
+  .wrap {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
   .bar {
     padding: 8px 10px 6px;
     gap: 8px;
+    max-width: 100%;
   }
 
   .pill {

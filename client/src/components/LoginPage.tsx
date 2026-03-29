@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import s from "./LoginPage.module.css";
 
 type Props = {
@@ -28,17 +28,6 @@ export function LoginPage({
 }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-
-  /* Allow body scroll while login page is mounted */
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "auto";
-    document.body.style.height = "auto";
-    return () => {
-      document.body.style.overflow = prev || "";
-      document.body.style.height = "";
-    };
-  }, []);
 
   return (
     <div className={s.page}>

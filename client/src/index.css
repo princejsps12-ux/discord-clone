@@ -96,8 +96,11 @@
 html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
-  /* prevent iOS text size inflate on rotate */
   -webkit-text-size-adjust: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  /* iOS: avoid rubber-band horizontal scroll */
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -105,14 +108,41 @@ body {
   color: var(--text-1);
   font-family: var(--font-body);
   font-weight: 400;
-  overflow: hidden;
-  height: 100vh;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  min-height: 100%;
+  min-height: 100dvh;
+  max-width: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'kern' 1, 'liga' 1;
   scrollbar-width: thin;
   scrollbar-color: var(--bg-float) transparent;
+}
+
+/* Flex column root — fixes mobile height + overflow with nested grids */
+#root {
+  min-height: 100%;
+  min-height: 100dvh;
+  max-width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Login shell: banner + page stack vertically and can scroll */
+.app-login-root {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); }
@@ -149,8 +179,10 @@ img, video { max-width: 100%; display: block; }
   grid-template-areas:
     "banner"
     "chat";
-  height: 100vh;
-  height: 100dvh; /* Dynamic viewport height for mobile browsers */
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
   overflow: hidden;
   background: var(--bg-void);
   color: var(--text-1);
@@ -164,6 +196,10 @@ img, video { max-width: 100%; display: block; }
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
   background: var(--bg-surface);
   background-image:
     radial-gradient(ellipse 55% 45% at 15% 20%, rgba(34, 211, 238, 0.09), transparent),
@@ -184,7 +220,10 @@ img, video { max-width: 100%; display: block; }
 /* ── Nav backdrop overlay ── */
 .nav-overlay {
   position: fixed;
-  inset: 0;
+  top: env(safe-area-inset-top, 0px);
+  left: env(safe-area-inset-left, 0px);
+  right: env(safe-area-inset-right, 0px);
+  bottom: env(safe-area-inset-bottom, 0px);
   background: rgba(0, 0, 0, 0.65);
   z-index: 150;
   cursor: pointer;
@@ -207,20 +246,59 @@ img, video { max-width: 100%; display: block; }
 /* ════════════════════════════════════════════════
    Mobile (<768px)
    ════════════════════════════════════════════════ */
+/* Scrollable category / filter row above chat (mobile) */
+.app-sub-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+  flex-shrink: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+
+.app-sub-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.app-sub-toolbar > * {
+  flex-shrink: 0;
+}
+
 @media (max-width: 767px) {
-  /* Nav drawer slides in from the left */
+  /* Safe areas: status bar + home indicator + rounded corners */
+  .app-shell {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    /* bottom inset: MessageInput + scroll areas handle it to avoid double padding */
+    box-sizing: border-box;
+  }
+
+  /* Nav drawer: never wider than viewport; respect notches */
   .app-nav-drawer {
     display: flex;
     position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: min(312px, 90vw);
+    left: env(safe-area-inset-left, 0px);
+    top: env(safe-area-inset-top, 0px);
+    bottom: env(safe-area-inset-bottom, 0px);
+    width: min(calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 320px);
+    max-width: calc(100vw - 8px);
     z-index: 200;
     transform: translateX(-100%);
     transition: transform 0.28s var(--ease);
     box-shadow: var(--shadow-lg);
     overflow: hidden;
+    box-sizing: border-box;
   }
 
   .nav-open .app-nav-drawer {
@@ -242,15 +320,19 @@ img, video { max-width: 100%; display: block; }
   .app-shell-members {
     grid-area: unset;
     position: fixed;
-    right: 0;
-    top: 0;
-    bottom: 0;
+    right: env(safe-area-inset-right, 0px);
+    top: env(safe-area-inset-top, 0px);
+    bottom: env(safe-area-inset-bottom, 0px);
     z-index: 175;
-    width: min(280px, 90vw);
+    width: min(calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px), 280px);
+    max-width: 100%;
     transform: translateX(100%);
     transition: transform 0.28s var(--ease);
     box-shadow: var(--shadow-lg);
     overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
   }
 
   .app-shell-members.members-open {
@@ -279,15 +361,17 @@ img, video { max-width: 100%; display: block; }
   .app-shell-members {
     grid-area: unset;
     position: fixed;
-    right: 0;
-    top: 0;
-    bottom: 0;
+    right: env(safe-area-inset-right, 0px);
+    top: env(safe-area-inset-top, 0px);
+    bottom: env(safe-area-inset-bottom, 0px);
     z-index: 150;
     width: 260px;
+    max-width: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px);
     transform: translateX(100%);
     transition: transform 0.28s var(--ease);
     box-shadow: var(--shadow-lg);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .app-shell-members.members-open {
